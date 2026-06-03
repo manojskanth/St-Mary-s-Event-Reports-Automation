@@ -83,12 +83,16 @@ with st.form("main_form"):
     raw_notes = st.text_area("Paste Event Notes / Narrative Data here", height=150)
 
     st.subheader("2. Supporting Documents Status")
+    
+    # FIXED: Added a prompt option as the first item so it doesn't auto-default to 'Attached'
+    doc_options = ["-- Select Status --", "Attached", "NA"]
+    
     d_cols = st.columns(5)
-    att_a = d_cols[0].selectbox("Brochure", ["Attached", "NA"])
-    att_b = d_cols[1].selectbox("Photos", ["Attached", "NA"])
-    att_c = d_cols[2].selectbox("List", ["Attached", "NA"])
-    att_d = d_cols[3].selectbox("Certificates", ["Attached", "NA"])
-    att_e = d_cols[4].selectbox("Winners", ["Attached", "NA"])
+    att_a = d_cols[0].selectbox("Brochure", doc_options, key="status_brochure")
+    att_b = d_cols[1].selectbox("Photos", doc_options, key="status_photos")
+    att_c = d_cols[2].selectbox("List", doc_options, key="status_list")
+    att_d = d_cols[3].selectbox("Certificates", doc_options, key="status_cert")
+    att_e = d_cols[4].selectbox("Winners", doc_options, key="status_winners")
 
     st.subheader("3. Document Asset Uploads")
     up1, up2 = st.columns(2)
@@ -121,12 +125,17 @@ if submit:
             def create_doc(template_path, is_iqac=True):
                 doc = DocxTemplate(template_path)
                 
-                # DYNAMIC DEPARTMENT HEADER FORMATTING LOGIC
-                # For administrative units, display name as-is. For core subjects, wrap with "Department of"
                 if form_dept in ["IQAC", "Research & Innovation"]:
                     dynamic_dept_header = form_dept
                 else:
                     dynamic_dept_header = f"Department of {form_dept}"
+                
+                # FALLBACK CLEANUP LOGIC: If left unchanged, automatically interpret it as "NA" instead of crashing or bugging out
+                clean_att_a = "NA" if att_a == "-- Select Status --" else str(att_a)
+                clean_att_b = "NA" if att_b == "-- Select Status --" else str(att_b)
+                clean_att_c = "NA" if att_c == "-- Select Status --" else str(att_c)
+                clean_att_d = "NA" if att_d == "-- Select Status --" else str(att_d)
+                clean_att_e = "NA" if att_e == "-- Select Status --" else str(att_e)
                 
                 ctx = {
                     'event_title': str(event_title).strip(),
@@ -134,17 +143,18 @@ if submit:
                     'academic_year': str(academic_year),
                     'organizer': str(organizer).strip(),
                     'dept': str(form_dept), 
-                    'dept_header': dynamic_dept_header,  # Map the newly created header placeholder variable safely
+                    'dept_header': dynamic_dept_header,  
                     'participants': str(participants),
                     'report_body': str(iqac_rep if is_iqac else sm_rep),
                     'objectives': str(obj if is_iqac else ""),
                     'outcomes': str(out if is_iqac else ""),
                     
-                    'attach_a': str(att_a), 
-                    'attach_b': str(att_b), 
-                    'attach_c': str(att_c),
-                    'attach_d': str(att_d), 
-                    'attach_e': str(att_e),
+                    # Safe mapped statuses bound to the context processor template
+                    'attach_a': clean_att_a, 
+                    'attach_b': clean_att_b, 
+                    'attach_c': clean_att_c,
+                    'attach_d': clean_att_d, 
+                    'attach_e': clean_att_e,
                     
                     'brochure_img': "", 'attendance_img': "",
                     'image_1': "", 'image_2': "", 'image_3': "",
