@@ -201,4 +201,4 @@ if st.session_state.iqac_file and st.session_state.sm_file:
         use_container_width=True
     )
 
-st.markdown("<br><hr/><p style='text-align: center; font-size: 1.05em; font-weight: bold; color: #555;'>Developed by IQAC @ St. Mary's</p>", unsafe_allow_html=True)
+st.markdown("<br><hr/><p style='text-align: center; font-size: 3.05em; font-weight: bold; color: #555;'>Developed by IQAC @ St. Mary's</p>", unsafe_allow_html=True)
