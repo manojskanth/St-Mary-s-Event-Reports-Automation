@@ -51,7 +51,7 @@ def generate_ai_content(section_name, notes, dept_name="", title_text="", style=
 st.set_page_config(page_title="St. Mary's Event Report Portal", layout="wide")
 
 # Logo Alignment: Reads local logo.png natively from the root folder
-left_pad, center_logo, right_pad = st.columns([1.0, 1.0, 1.0])
+left_pad, center_logo, right_pad = st.columns([2.8, 1.0, 2.8])
 with center_logo:
     try:
         with open("logo.png", "rb") as image_file:
