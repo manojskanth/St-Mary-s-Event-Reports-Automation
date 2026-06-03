@@ -4,7 +4,6 @@ from docx.shared import Inches
 import google.generativeai as genai
 import datetime
 import io
-import os
 import re
 
 # --- 1. CORE CONFIGURATION ---
@@ -40,14 +39,12 @@ def generate_ai_content(section_name, notes, dept_name="", title_text="", style=
 
     prompt = f"Task: Write '{section_name}' for St. Mary's College. Notes: {notes}. Rules: {rules}"
     
-    # Clean trailing spaces or characters automatically on execution
+    # Automatically cleans up any accidental copy-paste trailing spaces from secrets
     api_key_clean = st.secrets["GEMINI_KEY"].strip().replace('"', '').replace("'", "")
     genai.configure(api_key=api_key_clean)
-    
     model = genai.GenerativeModel(model_name)
     response = model.generate_content(prompt)
     
-    # Clean up text to prevent Word XML corruption
     return re.sub(r'[^\x00-\x7F]+', ' ', response.text).replace("**", "").strip()
 
 # --- 3. UI LAYOUT MATRIX SETUP ---
@@ -123,18 +120,26 @@ if submit:
 
             def create_doc(template_path, is_iqac=True):
                 doc = DocxTemplate(template_path)
+                
+                # DYNAMIC DEPARTMENT HEADER FORMATTING LOGIC
+                # For administrative units, display name as-is. For core subjects, wrap with "Department of"
+                if form_dept in ["IQAC", "Research & Innovation"]:
+                    dynamic_dept_header = form_dept
+                else:
+                    dynamic_dept_header = f"Department of {form_dept}"
+                
                 ctx = {
-                    'event_title': str(event_title),
+                    'event_title': str(event_title).strip(),
                     'event_date': event_date.strftime("%d-%m-%Y"),
                     'academic_year': str(academic_year),
-                    'organizer': str(organizer),
+                    'organizer': str(organizer).strip(),
                     'dept': str(form_dept), 
+                    'dept_header': dynamic_dept_header,  # Map the newly created header placeholder variable safely
                     'participants': str(participants),
                     'report_body': str(iqac_rep if is_iqac else sm_rep),
                     'objectives': str(obj if is_iqac else ""),
                     'outcomes': str(out if is_iqac else ""),
                     
-                    # FIXED: Explicit string conversion binds data directly to docxtpl elements
                     'attach_a': str(att_a), 
                     'attach_b': str(att_b), 
                     'attach_c': str(att_c),
