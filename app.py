@@ -21,9 +21,6 @@ ACADEMIC_YEARS = [
     "2024-25", "2025-26", "2026-27", "2027-28", "2028-29", "2029-30"
 ]
 
-# Permanent absolute asset link pointing directly to your uploaded image on GitHub
-LOGO_ASSET_URL = "https://raw.githubusercontent.com/manojkanth-k/research-data-entry/main/logo.png"
-
 # --- 2. AI ENGINE (Refined Rules & Expanded Social Media Payload) ---
 def generate_ai_content(section_name, notes, dept_name="", title_text="", style="formal"):
     model_name = 'gemini-2.5-flash-lite' 
@@ -52,10 +49,14 @@ def generate_ai_content(section_name, notes, dept_name="", title_text="", style=
 # --- 3. UI LAYOUT MATRIX SETUP ---
 st.set_page_config(page_title="St. Mary's Event Report Portal", layout="wide")
 
-# Logo Alignment: Positioned cleanly on top middle row grid using permanent absolute URL tracking
+# Logo Alignment: Reads local logo.png natively from the root folder
 left_pad, center_logo, right_pad = st.columns([1.8, 1.0, 1.8])
 with center_logo:
-    st.image(LOGO_ASSET_URL, use_container_width=True)
+    try:
+        with open("logo.png", "rb") as image_file:
+            st.image(image_file.read(), use_container_width=True)
+    except Exception:
+        st.markdown("<h3 style='text-align: center; color: #aaa;'>🏫 St. Mary's College</h3>", unsafe_allow_html=True)
 
 st.markdown("<h1 style='font-size: 2.5em; text-align: center; margin-bottom: 0px;'>Research Data Logging Desk</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin:15px 0px;' />", unsafe_allow_html=True)
@@ -178,4 +179,4 @@ if st.session_state.iqac_file and st.session_state.sm_file:
         use_container_width=True
     )
 
-st.markdown("<br><hr/><p style='text-align: center; font-size: 1.15em; font-weight: bold; color: #555;'>Developed by IQAC @ St. Mary's</p>", unsafe_allow_html=True)
+st.markdown("<br><hr/><p style='text-align: center; font-size: 1.05em; font-weight: bold; color: #555;'>Developed by IQAC @ St. Mary's</p>", unsafe_allow_html=True)
