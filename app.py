@@ -4,6 +4,7 @@ from docx.shared import Inches
 import google.generativeai as genai
 import datetime
 import io
+import os
 import re
 
 # --- 1. CORE CONFIGURATION ---
@@ -39,7 +40,10 @@ def generate_ai_content(section_name, notes, dept_name="", title_text="", style=
 
     prompt = f"Task: Write '{section_name}' for St. Mary's College. Notes: {notes}. Rules: {rules}"
     
-    genai.configure(api_key=st.secrets["GEMINI_KEY"])
+    # Clean trailing spaces or characters automatically on execution
+    api_key_clean = st.secrets["GEMINI_KEY"].strip().replace('"', '').replace("'", "")
+    genai.configure(api_key=api_key_clean)
+    
     model = genai.GenerativeModel(model_name)
     response = model.generate_content(prompt)
     
@@ -58,7 +62,7 @@ with center_logo:
     except Exception:
         st.markdown("<h3 style='text-align: center; color: #aaa;'>🏫 St. Mary's College</h3>", unsafe_allow_html=True)
 
-st.markdown("<h1 style='font-size: 2.5em; text-align: center; margin-bottom: 0px;'>Event Report Generator Desk</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='font-size: 2.5em; text-align: center; margin-bottom: 0px;'>Research Data Logging Desk</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin:15px 0px;' />", unsafe_allow_html=True)
 
 # Initialize Session States
@@ -130,6 +134,7 @@ if submit:
                     'objectives': str(obj if is_iqac else ""),
                     'outcomes': str(out if is_iqac else ""),
                     
+                    # FIXED: Explicit string conversion binds data directly to docxtpl elements
                     'attach_a': str(att_a), 
                     'attach_b': str(att_b), 
                     'attach_c': str(att_c),
