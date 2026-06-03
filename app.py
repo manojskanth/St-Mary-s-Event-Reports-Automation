@@ -84,7 +84,6 @@ with st.form("main_form"):
 
     st.subheader("2. Supporting Documents Status")
     
-    # FIXED: Added a prompt option as the first item so it doesn't auto-default to 'Attached'
     doc_options = ["-- Select Status --", "Attached", "NA"]
     
     d_cols = st.columns(5)
@@ -106,6 +105,14 @@ with st.form("main_form"):
 
 # --- 4. DATA COMPILATION ENGINE LOGIC ---
 if submit:
+    # STRICT DOCUMENT VALIDATION LAYER: Checks if any drop down is left on placeholder
+    unselected_docs = []
+    if att_a == "-- Select Status --": unselected_docs.append("Brochure")
+    if att_b == "-- Select Status --": unselected_docs.append("Photos")
+    if att_c == "-- Select Status --": unselected_docs.append("Participant List")
+    if att_d == "-- Select Status --": unselected_docs.append("Certificates")
+    if att_e == "-- Select Status --": unselected_docs.append("Winners Details")
+
     if form_dept == "-- Select Department --":
         st.error("Form Validation Error: Please select an explicit Department/Cell.")
     elif academic_year == "-- Select Academic Year --":
@@ -114,6 +121,9 @@ if submit:
         st.error("Form Validation Error: Event Title cannot be blank.")
     elif not raw_notes.strip():
         st.error("Form Validation Error: Narrative context notes are required!")
+    elif unselected_docs:
+        # Halts processing immediately and reports exactly which items are incomplete
+        st.error(f"Form Validation Error: Please select either 'Attached' or 'NA' for the following items: {', '.join(unselected_docs)}")
     else:
         try:
             with st.spinner("AI Processing System executing template compilation layers..."):
@@ -130,13 +140,6 @@ if submit:
                 else:
                     dynamic_dept_header = f"Department of {form_dept}"
                 
-                # FALLBACK CLEANUP LOGIC: If left unchanged, automatically interpret it as "NA" instead of crashing or bugging out
-                clean_att_a = "NA" if att_a == "-- Select Status --" else str(att_a)
-                clean_att_b = "NA" if att_b == "-- Select Status --" else str(att_b)
-                clean_att_c = "NA" if att_c == "-- Select Status --" else str(att_c)
-                clean_att_d = "NA" if att_d == "-- Select Status --" else str(att_d)
-                clean_att_e = "NA" if att_e == "-- Select Status --" else str(att_e)
-                
                 ctx = {
                     'event_title': str(event_title).strip(),
                     'event_date': event_date.strftime("%d-%m-%Y"),
@@ -149,12 +152,11 @@ if submit:
                     'objectives': str(obj if is_iqac else ""),
                     'outcomes': str(out if is_iqac else ""),
                     
-                    # Safe mapped statuses bound to the context processor template
-                    'attach_a': clean_att_a, 
-                    'attach_b': clean_att_b, 
-                    'attach_c': clean_att_c,
-                    'attach_d': clean_att_d, 
-                    'attach_e': clean_att_e,
+                    'attach_a': str(att_a), 
+                    'attach_b': str(att_b), 
+                    'attach_c': str(att_c),
+                    'attach_d': str(att_d), 
+                    'attach_e': str(att_e),
                     
                     'brochure_img': "", 'attendance_img': "",
                     'image_1': "", 'image_2': "", 'image_3': "",
