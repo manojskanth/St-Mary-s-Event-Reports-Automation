@@ -4,7 +4,6 @@ from docx.shared import Inches
 import google.generativeai as genai
 import datetime
 import io
-import os
 import re
 
 # --- 1. CORE CONFIGURATION ---
@@ -22,12 +21,14 @@ ACADEMIC_YEARS = [
     "2024-25", "2025-26", "2026-27", "2027-28", "2028-29", "2029-30"
 ]
 
+# Permanent absolute asset link pointing directly to your uploaded image on GitHub
+LOGO_ASSET_URL = "https://raw.githubusercontent.com/manojkanth-k/research-data-entry/main/logo.png"
+
 # --- 2. AI ENGINE (Refined Rules & Expanded Social Media Payload) ---
 def generate_ai_content(section_name, notes, dept_name="", title_text="", style="formal"):
     model_name = 'gemini-2.5-flash-lite' 
     
     if style == "social":
-        # Rule modified to match the full event report narrative length with 6-8 relevant hashtags
         rules = (
             "Write a detailed narrative event summary post based on the notes. "
             "Include an engaging hook, a comprehensive body breakdown paragraph, and finish "
@@ -51,11 +52,10 @@ def generate_ai_content(section_name, notes, dept_name="", title_text="", style=
 # --- 3. UI LAYOUT MATRIX SETUP ---
 st.set_page_config(page_title="St. Mary's Event Report Portal", layout="wide")
 
-# Logo Alignment: Positioned cleanly on top middle row grid
+# Logo Alignment: Positioned cleanly on top middle row grid using permanent absolute URL tracking
 left_pad, center_logo, right_pad = st.columns([1.8, 1.0, 1.8])
 with center_logo:
-    if os.path.exists("logo.png"):
-        st.image("logo.png", use_container_width=True)
+    st.image(LOGO_ASSET_URL, use_container_width=True)
 
 st.markdown("<h1 style='font-size: 2.5em; text-align: center; margin-bottom: 0px;'>Research Data Logging Desk</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin:15px 0px;' />", unsafe_allow_html=True)
@@ -72,7 +72,6 @@ with st.form("main_form"):
     with c1:
         event_title = st.text_input("Event Title", placeholder="Enter official name of the event...")
         event_date = st.date_input("Event Date", datetime.date.today())
-        # Restored the missing 5 Departments + IQAC + Research & Innovation choices dropdown
         form_dept = st.selectbox("Select Department / Cell", ["-- Select Department --"] + DEPARTMENTS)
     with c2:
         organizer = st.text_input("Event In-charge / Faculty Name", placeholder="Enter organizer's name...")
@@ -115,8 +114,6 @@ if submit:
                 iqac_rep = generate_ai_content("Narrative", raw_notes, style="formal")
                 obj = generate_ai_content("Objectives", raw_notes, style="formal")
                 out = generate_ai_content("Learning Outcomes", raw_notes, style="formal")
-                
-                # Fixed: Sent context tags to enable rich media generation matching the event narrative
                 sm_rep = generate_ai_content("Social Media", raw_notes, dept_name=form_dept, title_text=event_title.strip(), style="social")
 
             def create_doc(template_path, is_iqac=True):
@@ -126,13 +123,12 @@ if submit:
                     'event_date': event_date.strftime("%d-%m-%Y"),
                     'academic_year': str(academic_year),
                     'organizer': str(organizer),
-                    'dept': str(form_dept), # Dynamic contextual department mapping binded safely
+                    'dept': str(form_dept), 
                     'participants': str(participants),
                     'report_body': str(iqac_rep if is_iqac else sm_rep),
                     'objectives': str(obj if is_iqac else ""),
                     'outcomes': str(out if is_iqac else ""),
                     
-                    # Verification Grid binds mapping form responses perfectly to file parameters
                     'attach_a': str(att_a), 
                     'attach_b': str(att_b), 
                     'attach_c': str(att_c),
@@ -144,7 +140,6 @@ if submit:
                     'image_4': "", 'image_5': "", 'image_6': ""
                 }
                 
-                # Image streams conversion logic
                 if brochure_file: 
                     ctx['brochure_img'] = InlineImage(doc, io.BytesIO(brochure_file.getvalue()), width=Inches(4.5))
                 if attendance_file: 
@@ -159,7 +154,6 @@ if submit:
                 buf.seek(0)
                 return buf
 
-            # Store generation buffers in Session State
             st.session_state.iqac_file = create_doc("Sample_Event_Report_Template.docx", is_iqac=True)
             st.session_state.sm_file = create_doc("Social_Media_Report_Template.docx", is_iqac=False)
             st.success("✅ Both reports generated seamlessly and packaged successfully!")
@@ -167,7 +161,6 @@ if submit:
         except Exception as e:
             st.error(f"System Operational Exception: {e}")
 
-# Interactive download buttons display panel matrix
 if st.session_state.iqac_file and st.session_state.sm_file:
     dl_col1, dl_col2 = st.columns(2)
     dl_col1.download_button(
@@ -185,5 +178,4 @@ if st.session_state.iqac_file and st.session_state.sm_file:
         use_container_width=True
     )
 
-# Formatted larger footer block mapping requested IQAC parameter explicitly
 st.markdown("<br><hr/><p style='text-align: center; font-size: 1.15em; font-weight: bold; color: #555;'>Developed by IQAC @ St. Mary's</p>", unsafe_allow_html=True)
