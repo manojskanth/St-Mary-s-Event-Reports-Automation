@@ -58,7 +58,7 @@ with center_logo:
     except Exception:
         st.markdown("<h3 style='text-align: center; color: #aaa;'>🏫 St. Mary's College</h3>", unsafe_allow_html=True)
 
-st.markdown("<h1 style='font-size: 2.5em; text-align: center; margin-bottom: 0px;'>Research Data Logging Desk</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='font-size: 2.5em; text-align: center; margin-bottom: 0px;'>Event Report Generator Desk</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin:15px 0px;' />", unsafe_allow_html=True)
 
 # Initialize Session States
