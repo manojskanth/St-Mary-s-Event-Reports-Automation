@@ -22,6 +22,9 @@ ACADEMIC_YEARS = [
     "2024-25", "2025-26", "2026-27", "2027-28", "2028-29", "2029-30"
 ]
 
+# Supported standard file extensions across the submission matrices
+ALLOWED_EXTENSIONS = ['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png']
+
 # --- 2. AI ENGINE (Proportionate, Fluff-Free & Bulletless Prose) ---
 def generate_ai_content(section_name, notes, dept_name="", title_text="", style="formal"):
     model_name = 'gemini-2.5-flash-lite' 
@@ -109,16 +112,16 @@ with st.form("main_form"):
     att_d = d_cols[3].selectbox("Certificates Issued (with title and date)", doc_options, key="status_cert")
     att_e = d_cols[4].selectbox("Winners’ details (If Competition)", doc_options, key="status_winners")
 
-    # --- SECTION 3: UPLOADS (5 ENABLED CATEGORIES) ---
+    # --- SECTION 3: UPLOADS (5 EXPANDED MULTI-FORMAT CATEGORIES) ---
     st.subheader("3. Uploads")
     up_col1, up_col2 = st.columns(2)
     with up_col1:
-        brochure_file = st.file_uploader("Upload Brochure/Circular", type=['jpg','png','jpeg'])
-        attendance_file = st.file_uploader("Upload List of Participants with signatures", type=['jpg','png','jpeg'])
-        winners_file = st.file_uploader("Upload Winners’ details (If Competition)", type=['jpg','png','jpeg'], accept_multiple_files=True)
+        brochure_file = st.file_uploader("Upload Brochure/Circular", type=ALLOWED_EXTENSIONS)
+        attendance_file = st.file_uploader("Upload List of Participants with signatures", type=ALLOWED_EXTENSIONS)
+        winners_file = st.file_uploader("Upload Winners’ details (If Competition)", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
     with up_col2:
-        event_photos = st.file_uploader("Upload Photos (Up to 6 Assets)", type=['jpg','png','jpeg'], accept_multiple_files=True)
-        certificates_file = st.file_uploader("Upload Certificates Issued (with title and date)", type=['jpg','png','jpeg'], accept_multiple_files=True)
+        event_photos = st.file_uploader("Upload Photos", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
+        certificates_file = st.file_uploader("Upload Certificates Issued (with title and date)", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
 
     submit = st.form_submit_button("🚀 Generate Both Compiled Reports", use_container_width=True)
 
@@ -180,13 +183,18 @@ if submit:
                     'image_4': "", 'image_5': "", 'image_6': ""
                 }
                 
-                if brochure_file: 
+                # Render logic checks file extension to dynamically place layout images safely into the DOCX Template
+                if brochure_file and brochure_file.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png']: 
                     ctx['brochure_img'] = InlineImage(doc, io.BytesIO(brochure_file.getvalue()), width=Inches(4.5))
-                if attendance_file: 
+                if attendance_file and attendance_file.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png']: 
                     ctx['attendance_img'] = InlineImage(doc, io.BytesIO(attendance_file.getvalue()), width=Inches(4.5))
+                
                 if event_photos:
-                    for i, p in enumerate(event_photos[:6]): 
-                        ctx[f'image_{i+1}'] = InlineImage(doc, io.BytesIO(p.getvalue()), width=Inches(3.2))
+                    img_idx = 1
+                    for p in event_photos:
+                        if p.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png'] and img_idx <= 6:
+                            ctx[f'image_{img_idx}'] = InlineImage(doc, io.BytesIO(p.getvalue()), width=Inches(3.2))
+                            img_idx += 1
                 
                 doc.render(ctx)
                 buf = io.BytesIO()
@@ -201,7 +209,7 @@ if submit:
         except Exception as e:
             st.error(f"System Operational Exception: {e}")
 
-# --- 5. COMPILING MULTI-FILE AND ZIP ZIP DOWNLOAD LAYERS ---
+# --- 5. COMPILING MULTI-FILE AND ZIP DOWNLOAD LAYERS ---
 if st.session_state.iqac_file and st.session_state.sm_file:
     dl_col1, dl_col2, dl_col3 = st.columns(3)
     
@@ -224,11 +232,12 @@ if st.session_state.iqac_file and st.session_state.sm_file:
     if event_photos:
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-            for idx, photo in enumerate(event_photos):
-                photo_bytes = photo.read()
-                file_ext = photo.name.split(".")[-1]
-                archive_name = f"Photo_{idx+1}.{file_ext}"
-                zip_file.writestr(archive_name, photo_bytes)
+            for idx, file_asset in enumerate(event_photos):
+                file_bytes = file_asset.read()
+                file_ext = file_asset.name.split(".")[-1]
+                # Keeps the exact file naming extension cleanly mapped inside the folder
+                archive_name = f"Document_{idx+1}.{file_ext}"
+                zip_file.writestr(archive_name, file_bytes)
         
         zip_buffer.seek(0)
         clean_folder_title = event_title.replace(" ", "_")
