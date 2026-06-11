@@ -52,12 +52,12 @@ def generate_ai_content(section_name, notes, dept_name="", title_text="", style=
     model = genai.GenerativeModel(model_name)
     response = model.generate_content(prompt)
     
-    # Strip asterisks and clean non-ASCII chars cleanly
+    # Strip asterisks and clean non-ASCII characters cleanly
     cleaned_text = re.sub(r'[^\x00-\x7F]+', ' ', response.text).replace("**", "").replace("*", "").strip()
     return cleaned_text
 
 # --- 3. UI LAYOUT MATRIX SETUP ---
-st.set_page_config(page_title="St. Mary's Event Report Portal", layout="wide")
+st.set_page_config(page_title="St. Mary's Event Report Generator", layout="wide")
 
 # Custom Styling Parameters matching IQAC Institutional Guidelines
 st.markdown("""
@@ -75,7 +75,7 @@ with center_logo:
     except Exception:
         st.markdown("<h3 style='text-align: center; color: #1F4E78;'>🏫 St. Mary's College</h3>", unsafe_allow_html=True)
 
-st.markdown("<h1 style='font-size: 2.3em; text-align: center; margin-bottom: 0px;'>Research Data Logging Desk</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='font-size: 2.5em; text-align: center; margin-bottom: 0px;'>Event Report Generator</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin:15px 0px;' />", unsafe_allow_html=True)
 
 # Initialize Session States
@@ -85,7 +85,7 @@ if 'sm_file' not in st.session_state:
     st.session_state.sm_file = None
 
 with st.form("main_form"):
-    st.subheader("1. Profile & Metadata")
+    st.subheader("1. Profile")
     c1, c2 = st.columns(2)
     with c1:
         event_title = st.text_input("Event Title", placeholder="Enter official name of the event...")
@@ -98,40 +98,29 @@ with st.form("main_form"):
 
     raw_notes = st.text_area("Paste Event Notes / Narrative Data here", height=150)
 
-    # --- UPDATED LABELS, RESTRUCTURED DROPDOWNS & DEDICATED UPLOAD TABS ---
-    st.subheader("2. Supporting Documents Status & Asset Uploads")
-    
+    # --- SECTION 2: SUPPORTING DOCUMENTS STATUS (COMPACT GRID) ---
+    st.subheader("2. Supporting Documents Status")
     doc_options = ["-- Select Status --", "Attached", "NA"]
     
-    tab_brochure, tab_photos, tab_participants, tab_certificates, tab_winners = st.tabs([
-        "Brochure/Circular",
-        "Photos",
-        "List of Participants with signatures",
-        "Certificates Issued (with title and date)",
-        "Winners’ details (If Competition)"
-    ])
-    
-    with tab_brochure:
-        att_a = st.selectbox("Document Status (Brochure/Circular):", doc_options, key="status_brochure")
-        brochure_file = st.file_uploader("Upload Brochure or Circular (JPG/PNG/JPEG)", type=['jpg','png','jpeg'])
-        
-    with tab_photos:
-        att_b = st.selectbox("Document Status (Photos):", doc_options, key="status_photos")
-        event_photos = st.file_uploader("Upload Event Photos (Up to 6 Assets)", type=['jpg','png','jpeg'], accept_multiple_files=True)
-        
-    with tab_participants:
-        att_c = st.selectbox("Document Status (List of Participants with signatures):", doc_options, key="status_list")
-        attendance_file = st.file_uploader("Upload Participant Lists with Signatures", type=['jpg','png','jpeg'])
-        
-    with tab_certificates:
-        att_d = st.selectbox("Document Status (Certificates Issued):", doc_options, key="status_cert")
-        certificates_file = st.file_uploader("Upload Sample Certificates Issued", type=['jpg','png','jpeg'], accept_multiple_files=True)
-        
-    with tab_winners:
-        att_e = st.selectbox("Document Status (Winners’ details):", doc_options, key="status_winners")
-        winners_file = st.file_uploader("Upload Winners Details Document", type=['jpg','png','jpeg'], accept_multiple_files=True)
+    d_cols = st.columns(5)
+    att_a = d_cols[0].selectbox("Brochure/Circular", doc_options, key="status_brochure")
+    att_b = d_cols[1].selectbox("Photos", doc_options, key="status_photos")
+    att_c = d_cols[2].selectbox("List of Participants with signatures", doc_options, key="status_list")
+    att_d = d_cols[3].selectbox("Certificates Issued (with title and date)", doc_options, key="status_cert")
+    att_e = d_cols[4].selectbox("Winners’ details (If Competition)", doc_options, key="status_winners")
 
-    submit = st.form_submit_button("🚀 Generate Both Compiled Reports & Media Packages", use_container_width=True)
+    # --- SECTION 3: UPLOADS (5 ENABLED CATEGORIES) ---
+    st.subheader("3. Uploads")
+    up_col1, up_col2 = st.columns(2)
+    with up_col1:
+        brochure_file = st.file_uploader("Upload Brochure/Circular", type=['jpg','png','jpeg'])
+        attendance_file = st.file_uploader("Upload List of Participants with signatures", type=['jpg','png','jpeg'])
+        winners_file = st.file_uploader("Upload Winners’ details (If Competition)", type=['jpg','png','jpeg'], accept_multiple_files=True)
+    with up_col2:
+        event_photos = st.file_uploader("Upload Photos (Up to 6 Assets)", type=['jpg','png','jpeg'], accept_multiple_files=True)
+        certificates_file = st.file_uploader("Upload Certificates Issued (with title and date)", type=['jpg','png','jpeg'], accept_multiple_files=True)
+
+    submit = st.form_submit_button("🚀 Generate Both Compiled Reports", use_container_width=True)
 
 # --- 4. DATA COMPILATION ENGINE LOGIC ---
 if submit:
@@ -207,12 +196,12 @@ if submit:
 
             st.session_state.iqac_file = create_doc("Sample_Event_Report_Template.docx", is_iqac=True)
             st.session_state.sm_file = create_doc("Social_Media_Report_Template.docx", is_iqac=False)
-            st.success("✅ Reports compiled and archived successfully!")
+            st.success("✅ Both reports generated seamlessly and packaged successfully!")
 
         except Exception as e:
             st.error(f"System Operational Exception: {e}")
 
-# --- 5. COMPILING THE DYNAMIC ZIP MEDIA DOWNLOAD LAYER ---
+# --- 5. COMPILING MULTI-FILE AND ZIP ZIP DOWNLOAD LAYERS ---
 if st.session_state.iqac_file and st.session_state.sm_file:
     dl_col1, dl_col2, dl_col3 = st.columns(3)
     
@@ -231,7 +220,7 @@ if st.session_state.iqac_file and st.session_state.sm_file:
         use_container_width=True
     )
     
-    # --- AUTOMATED ZIP CONTAINER PACKAGING FOR IMAGES ---
+    # --- AUTOMATED ZIP ARCHIVE DOWNLOAD FOR PHOTO ASSETS ---
     if event_photos:
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
