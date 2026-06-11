@@ -25,46 +25,56 @@ ACADEMIC_YEARS = [
     "2024-25", "2025-26", "2026-27", "2027-28", "2028-29", "2029-30"
 ]
 
-# Comprehensive multi-format extension matrix allowance (PDF, Word, Images)
 ALLOWED_EXTENSIONS = ['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png']
 SPREADSHEET_ID = "1VIQ7K0F9WveK2DDAnacw17nMiCq3ux803oqr7mVkvpo"
 
 # --- 2. LIVE GOOGLE SPREADSHEET TELEMETRY LOGGING SYSTEM ---
 def append_google_sheet_log(user_name, department, title_text):
-    """Securely scrubs hidden rich-text characters, decodes Base64, and logs rows to Google Sheets."""
+    """Securely authenticates using a multi-stage fallback engine to completely bypass PEM loading errors."""
     try:
         if "gspread" not in st.secrets:
             st.error("Configuration Error: '[gspread]' section missing from secrets dashboard.")
             return False
             
         sec = st.secrets["gspread"]
-        
-        # --- ADVANCED TEXT CLEANING FILTER ---
-        # Force conversion to a clean string format
-        base64_str = str(sec["private_key_base64"]).strip()
-        
-        # Strip out any accidental quotes or backslashes added during copy-paste
-        base64_str = base64_str.replace('"', '').replace("'", "").replace("\\", "")
-        
-        # Regex Filter: Strip out non-Base64 noise bytes (whitespace, invalid rich text tags)
-        base64_str = re.sub(r'[^A-Za-z0-9+/=]', '', base64_str)
-        
-        # Decode the clean string safely to bytes
-        decoded_bytes = base64.b64decode(base64_str)
-        
-        # Force clean string decoding while ignoring formatting anomalies like 0x82
-        inner_key_content = decoded_bytes.decode("utf-8", errors="ignore").strip()
-        
-        # Reconstruct the exact multiline envelope Google expects
-        if "BEGIN PRIVATE KEY" not in inner_key_content:
-            final_pem_key = (
-                "-----BEGIN PRIVATE KEY-----\n"
-                f"{inner_key_content}\n"
-                "-----END PRIVATE KEY-----\n"
-            )
-        else:
-            final_pem_key = inner_key_content
-        
+        final_pem_key = None
+
+        # --- FALLBACK LAYER 1: MULTI-LINE TRIPLE QUOTE ENVELOPE CHECK ---
+        if "private_key" in sec and "-----BEGIN PRIVATE KEY-----" in str(sec["private_key"]):
+            final_pem_key = str(sec["private_key"]).replace("\\n", "\n").strip()
+            # Clean up potential accidental enclosing quote marks from formatting
+            if final_pem_key.startswith('"') and final_pem_key.endswith('"'):
+                final_pem_key = final_pem_key[1:-1].strip()
+            if final_pem_key.startswith("'") and final_pem_key.endswith("'"):
+                final_pem_key = final_pem_key[1:-1].strip()
+
+        # --- FALLBACK LAYER 2: CLEAN BASE64 STRING ENCODING ENGINE ---
+        elif "private_key_base64" in sec:
+            base64_str = str(sec["private_key_base64"]).strip()
+            # Strip accidental nested text wrapper strings
+            base64_str = base64_str.replace('"', '').replace("'", "").replace("\\", "")
+            base64_str = re.sub(r'[^A-Za-z0-9+/=]', '', base64_str)
+            
+            try:
+                decoded_bytes = base64.b64decode(base64_str)
+                inner_key_content = decoded_bytes.decode("utf-8", errors="ignore").strip()
+                
+                if "BEGIN PRIVATE KEY" not in inner_key_content:
+                    final_pem_key = (
+                        "-----BEGIN PRIVATE KEY-----\n"
+                        f"{inner_key_content}\n"
+                        "-----END PRIVATE KEY-----\n"
+                    )
+                else:
+                    final_pem_key = inner_key_content
+            except Exception:
+                pass
+
+        # If both extraction engines fail to parse a structural layout, throw a safe structural block guide
+        if not final_pem_key:
+            st.error("🔒 Cryptography Alert: The 'private_key' text layout formatting could not be mapped safely. Please verify your secrets window alignment structure.")
+            return False
+            
         credentials_dict = {
             "type": str(sec["type"]),
             "project_id": str(sec["project_id"]),
@@ -82,13 +92,11 @@ def append_google_sheet_log(user_name, department, title_text):
         creds = Credentials.from_service_account_info(credentials_dict, scopes=scope)
         client = gspread.authorize(creds)
         
-        # Open the sheet via your master key identifier
         workbook = client.open_by_key(SPREADSHEET_ID)
         sheet = workbook.get_worksheet(0) 
         
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Initial check: Create headers if sheet is blank
         if len(sheet.get_all_values()) == 0:
             sheet.append_row(["Timestamp", "Faculty In-Charge", "Department/Cell", "Event Title"])
             
@@ -179,7 +187,6 @@ with st.form("main_form"):
         participants = st.number_input("No. of Participants", min_value=0, step=1)
         academic_year = st.selectbox("Select Academic Year", ["-- Select Academic Year --"] + ACADEMIC_YEARS)
 
-    # Transparent Guidelines Formatting Vector Help Layout
     placeholder_guidelines = (
         "Please mention the following in bullet points:\n"
         "# Where did event take place...\n"
@@ -201,7 +208,7 @@ with st.form("main_form"):
     att_d = d_cols[3].selectbox("Certificates Issued (with title and date)", doc_options, key="status_cert")
     att_e = d_cols[4].selectbox("Winners’ details (If Competition)", doc_options, key="status_winners")
 
-    # --- SECTION 3: UPLOADS (5 FILE FORMAT CATEGORIES ALLOWED NATIVELY) ---
+    # --- SECTION 3: UPLOADS ---
     st.subheader("3. Uploads")
     up_col1, up_col2 = st.columns(2)
     with up_col1:
@@ -214,7 +221,7 @@ with st.form("main_form"):
 
     submit = st.form_submit_button("🚀 Generate Both Compiled Reports & Sync Log Metrics", use_container_width=True)
 
-# --- 6. DATA COMPILATION ENGINE AND EXECUTION LOGIC ---
+# --- 6. DATA PROCESSING AND ENGINE TRIGGERS ---
 if submit:
     unselected_docs = []
     if att_a == "-- Select Status --": unselected_docs.append("Brochure/Circular")
@@ -235,7 +242,7 @@ if submit:
         st.error(f"Form Validation Error: Please select either 'Attached' or 'NA' for the following items: {', '.join(unselected_docs)}")
     else:
         try:
-            with st.spinner("Executing systems architecture, writing metadata tables, and parsing document models..."):
+            with st.spinner("Executing system processes, compiling layout documents, and syncing logs..."):
                 iqac_rep = generate_ai_content("Narrative", raw_notes, style="formal")
                 obj = generate_ai_content("Objectives", raw_notes, style="formal")
                 out = generate_ai_content("Learning Outcomes", raw_notes, style="formal")
@@ -281,7 +288,7 @@ if submit:
             st.session_state.iqac_file = create_doc("Sample_Event_Report_Template.docx", is_iqac=True)
             st.session_state.sm_file = create_doc("Social_Media_Report_Template.docx", is_iqac=False)
             
-            # Execute cloud spreadsheet cell sync append
+            # Execute logging sequence
             sheet_sync = append_google_sheet_log(organizer, form_dept, event_title)
             if sheet_sync:
                 st.success("📊 Live usage metrics systematically logged to Google Sheets!")
