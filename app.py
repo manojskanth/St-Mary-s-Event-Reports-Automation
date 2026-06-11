@@ -24,14 +24,14 @@ ACADEMIC_YEARS = [
     "2024-25", "2025-26", "2026-27", "2027-28", "2028-29", "2029-30"
 ]
 
+# Comprehensive multi-format extension matrix allowance (PDF, Word, Images)
 ALLOWED_EXTENSIONS = ['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png']
 SPREADSHEET_ID = "1VIQ7K0F9WveK2DDAnacw17nMiCq3ux803oqr7mVkvpo"
 
 # --- 2. LIVE GOOGLE SPREADSHEET TELEMETRY LOGGING SYSTEM ---
 def append_google_sheet_log(user_name, department, title_text):
-    """Securely authenticates and appends usage analytics rows to your cloud tracking sheet."""
+    """Securely authenticates and appends usage analytics rows to the first tab of your cloud sheet."""
     try:
-        # Check if gspread credentials dictionary is mounted in st.secrets
         if "gspread" not in st.secrets:
             st.error("Configuration Error: '[gspread]' credentials section is missing from Streamlit secrets dashboard!")
             return False
@@ -41,12 +41,17 @@ def append_google_sheet_log(user_name, department, title_text):
         creds = Credentials.from_service_account_info(credentials_dict, scopes=scope)
         client = gspread.authorize(creds)
         
-        # Connect to your specified master spreadsheet
-        sheet = client.open_by_key(SPREADSHEET_ID).sheet1
+        # Open by key and target the absolute first tab by position index, bypassing name mismatch bugs
+        workbook = client.open_by_key(SPREADSHEET_ID)
+        sheet = workbook.get_worksheet(0) 
         
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Automatically append row data to the bottom of your live sheet matrix
+        # Auto-initialization: If the target sheet is fresh and empty, write columns first
+        if len(sheet.get_all_values()) == 0:
+            sheet.append_row(["Timestamp", "Faculty In-Charge", "Department/Cell", "Event Title"])
+            
+        # Append data row safely to the bottom of the log matrix
         sheet.append_row([timestamp, user_name, department, title_text])
         return True
     except Exception as e:
@@ -121,6 +126,7 @@ if 'iqac_file' not in st.session_state:
 if 'sm_file' not in st.session_state:
     st.session_state.sm_file = None
 
+# --- 5. MAIN FORM LAYOUT BLOCK ---
 with st.form("main_form"):
     st.subheader("1. Profile")
     c1, c2 = st.columns(2)
@@ -133,6 +139,7 @@ with st.form("main_form"):
         participants = st.number_input("No. of Participants", min_value=0, step=1)
         academic_year = st.selectbox("Select Academic Year", ["-- Select Academic Year --"] + ACADEMIC_YEARS)
 
+    # Custom Transparent Placeholder Hint Matrix Guidelines
     placeholder_guidelines = (
         "Please mention the following in bullet points:\n"
         "# Where did event take place...\n"
@@ -154,7 +161,7 @@ with st.form("main_form"):
     att_d = d_cols[3].selectbox("Certificates Issued (with title and date)", doc_options, key="status_cert")
     att_e = d_cols[4].selectbox("Winners’ details (If Competition)", doc_options, key="status_winners")
 
-    # --- SECTION 3: UPLOADS ---
+    # --- SECTION 3: UPLOADS (5 EXPANDED MULTI-FORMAT CATEGORIES) ---
     st.subheader("3. Uploads")
     up_col1, up_col2 = st.columns(2)
     with up_col1:
@@ -167,7 +174,7 @@ with st.form("main_form"):
 
     submit = st.form_submit_button("🚀 Generate Both Compiled Reports & Sync Log Metrics", use_container_width=True)
 
-# --- 5. DATA COMPILATION & CLOUD RECORD LOG BLOCK ENGINE ---
+# --- 6. DATA COMPILATION ENGINE & EXECUTION PIPELINE ---
 if submit:
     unselected_docs = []
     if att_a == "-- Select Status --": unselected_docs.append("Brochure/Circular")
@@ -188,7 +195,7 @@ if submit:
         st.error(f"Form Validation Error: Please select either 'Attached' or 'NA' for the following items: {', '.join(unselected_docs)}")
     else:
         try:
-            with st.spinner("Executing system processes, formatting template packages, and syncing metrics cloud logs..."):
+            with st.spinner("Executing processes, formatting template packages, and syncing spreadsheet metric logs..."):
                 iqac_rep = generate_ai_content("Narrative", raw_notes, style="formal")
                 obj = generate_ai_content("Objectives", raw_notes, style="formal")
                 out = generate_ai_content("Learning Outcomes", raw_notes, style="formal")
@@ -213,6 +220,7 @@ if submit:
                     'brochure_img': "", 'attendance_img': "", 'image_1': "", 'image_2': "", 'image_3': "", 'image_4': "", 'image_5': "", 'image_6': ""
                 }
                 
+                # Image render pipelines verify format before embedding safely into the Word template layout block
                 if brochure_file and brochure_file.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png']: 
                     ctx['brochure_img'] = InlineImage(doc, io.BytesIO(brochure_file.getvalue()), width=Inches(4.5))
                 if attendance_file and attendance_file.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png']: 
@@ -234,7 +242,7 @@ if submit:
             st.session_state.iqac_file = create_doc("Sample_Event_Report_Template.docx", is_iqac=True)
             st.session_state.sm_file = create_doc("Social_Media_Report_Template.docx", is_iqac=False)
             
-            # RUNS LIVE GOOGLE SPREADSHEET CELL APPEND METRICS ENGINE
+            # Sync session metric metrics log line to Google sheet
             sheet_sync = append_google_sheet_log(organizer, form_dept, event_title)
             if sheet_sync:
                 st.success("📊 Live usage metrics systematically logged to Google Sheets!")
@@ -244,7 +252,7 @@ if submit:
         except Exception as e:
             st.error(f"System Operational Exception: {e}")
 
-# --- 6. ASSET DOWNLOAD ROUTINES ---
+# --- 7. DOWNLOAD BUTTON CONTAINER ASSET ROUTINES ---
 if st.session_state.iqac_file and st.session_state.sm_file:
     dl_col1, dl_col2, dl_col3 = st.columns(3)
     
@@ -263,6 +271,7 @@ if st.session_state.iqac_file and st.session_state.sm_file:
         use_container_width=True
     )
     
+    # Bundle uploaded images dynamically into a ZIP archive named after the event title
     if event_photos:
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
