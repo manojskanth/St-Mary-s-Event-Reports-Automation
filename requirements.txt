@@ -2,3 +2,5 @@ streamlit
 docxtpl
 python-docx
 google-generativeai
+gspread
+google-auth
