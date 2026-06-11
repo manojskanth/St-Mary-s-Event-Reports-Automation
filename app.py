@@ -77,7 +77,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-left_pad, center_logo, right_pad = st.columns([1.8, 1.0, 1.8])
+left_pad, center_logo, right_pad = st.columns([1.8, 0.5, 1.8])
 with center_logo:
     try:
         with open("logo.png", "rb") as image_file:
