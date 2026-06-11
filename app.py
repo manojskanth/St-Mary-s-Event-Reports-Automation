@@ -1,173 +1,257 @@
 import streamlit as st
+from docxtpl import DocxTemplate, InlineImage
+from docx.shared import Inches
+import google.generativeai as genai
+import datetime
 import io
-import zipfile
 import re
+import zipfile
 
-# =========================================================
-# 1. PAGE INITIALIZATION & CONFIGURATION
-# =========================================================
-st.set_page_config(
-    page_title="St. Mary's Institutional Event Report Generator",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+# --- 1. CORE CONFIGURATION ---
+DEPARTMENTS = [
+    "English & Languages", 
+    "Social Sciences & Humanities", 
+    "Sciences", 
+    "Management", 
+    "Commerce",
+    "IQAC",
+    "Research & Innovation"
+]
 
-# Custom Institutional CSS styling parameters
+ACADEMIC_YEARS = [
+    "2024-25", "2025-26", "2026-27", "2027-28", "2028-29", "2029-30"
+]
+
+# --- 2. AI ENGINE (Proportionate, Fluff-Free & Bulletless Prose) ---
+def generate_ai_content(section_name, notes, dept_name="", title_text="", style="formal"):
+    model_name = 'gemini-2.5-flash-lite' 
+    
+    if style == "social":
+        rules = (
+            "Write a detailed narrative event summary post based on the notes. "
+            "Include an engaging hook, a comprehensive body breakdown paragraph, and finish "
+            "by dynamically generating exactly 6 to 8 highly relevant trending hashtags based on the "
+            f"Department: {dept_name} and Event: {title_text}. Do not use intro fluff or conversational tags."
+        )
+    elif section_name in ["Objectives", "Learning Outcomes"]:
+        rules = (
+            "Write exactly 2 lines. Do not use asterisks, hyphens, bullet points, or numbering. "
+            "Write as plain, direct text blocks. Avoid generic buzzwords like 'to foster', 'to highlight', or 'tailored to'. "
+            "Keep the length of the content strictly proportionate to the volume of input facts provided without exaggerating details."
+        )
+    else: # IQAC Narrative
+        rules = (
+            "Formal academic summary. STRICT LIMIT: Max 150 words. No intro fluff or placeholder text. "
+            "Keep content strictly proportionate to inputs provided without exaggerating or hallucinating additional events."
+        )
+
+    prompt = f"Task: Write '{section_name}' for St. Mary's College. Notes: {notes}. Rules: {rules}"
+    
+    api_key_clean = st.secrets["GEMINI_KEY"].strip().replace('"', '').replace("'", "")
+    genai.configure(api_key=api_key_clean)
+    model = genai.GenerativeModel(model_name)
+    response = model.generate_content(prompt)
+    
+    # Strip asterisks and clean non-ASCII chars cleanly
+    cleaned_text = re.sub(r'[^\x00-\x7F]+', ' ', response.text).replace("**", "").replace("*", "").strip()
+    return cleaned_text
+
+# --- 3. UI LAYOUT MATRIX SETUP ---
+st.set_page_config(page_title="St. Mary's Event Report Portal", layout="wide")
+
+# Custom Styling Parameters matching IQAC Institutional Guidelines
 st.markdown("""
     <style>
-    .main-title { font-size:26px !important; font-weight: bold; color: #1F4E78; margin-bottom: 5px; }
-    .sub-title { font-size:14px !important; font-style: italic; color: #5A5A5A; margin-bottom: 25px; }
-    .section-header { font-size:18px !important; font-weight: bold; color: #1F4E78; margin-top: 20px; }
     div.stButton > button:first-child { background-color: #1F4E78; color: white; border-radius: 4px; }
     div.stDownloadButton > button:first-child { background-color: #2E7D32; color: white; border-radius: 4px; }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="main-title">St. Mary\'s College</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">Internal Quality Assurance Cell (IQAC) — Automated Event Report Engine</div>', unsafe_allow_html=True)
+left_pad, center_logo, right_pad = st.columns([1.8, 1.0, 1.8])
+with center_logo:
+    try:
+        with open("logo.png", "rb") as image_file:
+            st.image(image_file.read(), use_container_width=True)
+    except Exception:
+        st.markdown("<h3 style='text-align: center; color: #1F4E78;'>🏫 St. Mary's College</h3>", unsafe_allow_html=True)
 
-# =========================================================
-# 2. CORE INPUT PROCESSING DATA ZONE (PROPORTIONATE & RAW)
-# =========================================================
-with st.sidebar:
-    st.header("Event Metadata Input")
-    event_title = st.text_input("Event Title", placeholder="e.g., National Seminar on Indigenous Literature")
-    event_date = st.date_input("Event Date")
-    department = st.text_input("Organizing Department/Cell", value="Department of English and Languages")
-    raw_inputs = st.text_area("Event Key Notes / Data Points", placeholder="Paste direct, raw facts, speakers, or student counts here...", height=250)
+st.markdown("<h1 style='font-size: 2.3em; text-align: center; margin-bottom: 0px;'>Research Data Logging Desk</h1>", unsafe_allow_html=True)
+st.markdown("<hr style='margin:15px 0px;' />", unsafe_allow_html=True)
 
-# Strict text builder without generic AI words, fluff, or asterisk bullet styling
-def process_report_content(text_input, title_context):
-    if not text_input.strip():
-        return "No sufficient metadata provided to structure report narratives."
-        
-    # Split by lines and clean boundaries
-    raw_lines = [line.strip() for line in text_input.split('\n') if line.strip()]
+# Initialize Session States
+if 'iqac_file' not in st.session_state:
+    st.session_state.iqac_file = None
+if 'sm_file' not in st.session_state:
+    st.session_state.sm_file = None
+
+with st.form("main_form"):
+    st.subheader("1. Profile & Metadata")
+    c1, c2 = st.columns(2)
+    with c1:
+        event_title = st.text_input("Event Title", placeholder="Enter official name of the event...")
+        event_date = st.date_input("Event Date", datetime.date.today())
+        form_dept = st.selectbox("Select Department / Cell", ["-- Select Department --"] + DEPARTMENTS)
+    with c2:
+        organizer = st.text_input("Event In-charge / Faculty Name", placeholder="Enter organizer's name...")
+        participants = st.number_input("No. of Participants", min_value=0, step=1)
+        academic_year = st.selectbox("Select Academic Year", ["-- Select Academic Year --"] + ACADEMIC_YEARS)
+
+    raw_notes = st.text_area("Paste Event Notes / Narrative Data here", height=150)
+
+    # --- UPDATED LABELS, RESTRUCTURED DROPDOWNS & DEDICATED UPLOAD TABS ---
+    st.subheader("2. Supporting Documents Status & Asset Uploads")
     
-    objectives_output = []
-    outcomes_output = []
+    doc_options = ["-- Select Status --", "Attached", "NA"]
     
-    for line in raw_lines:
-        # Strip preexisting asterisk or dash characters if user pasted them
-        clean_line = line.lstrip('*•- ').rstrip('.')
-        
-        # Guard against generic AI phrases or fluff
-        if any(fluff in clean_line.lower() for fluff in ["here are", "objectives for", "tailored to", "foster an", "broader spectrum"]):
-            continue
-            
-        # Keep generation length strictly proportionate to inputs provided
-        objectives_output.append(f"To address the parameters of {clean_line.lower()}.")
-        outcomes_output.append(f"Resulted in direct academic development regarding {clean_line.lower()}.")
-        
-    # Assemble raw text output blocks with zero conversational introductions
-    structured_report = f"EVENT REPORT: {title_context.upper()}\n"
-    structured_report += f"DATE: {event_date}\n"
-    structured_report += f"ORGANIZING BODY: {department}\n\n"
+    tab_brochure, tab_photos, tab_participants, tab_certificates, tab_winners = st.tabs([
+        "Brochure/Circular",
+        "Photos",
+        "List of Participants with signatures",
+        "Certificates Issued (with title and date)",
+        "Winners’ details (If Competition)"
+    ])
     
-    structured_report += "EVENT OBJECTIVES\n"
-    if objectives_output:
-        structured_report += "\n".join(objectives_output)
+    with tab_brochure:
+        att_a = st.selectbox("Document Status (Brochure/Circular):", doc_options, key="status_brochure")
+        brochure_file = st.file_uploader("Upload Brochure or Circular (JPG/PNG/JPEG)", type=['jpg','png','jpeg'])
+        
+    with tab_photos:
+        att_b = st.selectbox("Document Status (Photos):", doc_options, key="status_photos")
+        event_photos = st.file_uploader("Upload Event Photos (Up to 6 Assets)", type=['jpg','png','jpeg'], accept_multiple_files=True)
+        
+    with tab_participants:
+        att_c = st.selectbox("Document Status (List of Participants with signatures):", doc_options, key="status_list")
+        attendance_file = st.file_uploader("Upload Participant Lists with Signatures", type=['jpg','png','jpeg'])
+        
+    with tab_certificates:
+        att_d = st.selectbox("Document Status (Certificates Issued):", doc_options, key="status_cert")
+        certificates_file = st.file_uploader("Upload Sample Certificates Issued", type=['jpg','png','jpeg'], accept_multiple_files=True)
+        
+    with tab_winners:
+        att_e = st.selectbox("Document Status (Winners’ details):", doc_options, key="status_winners")
+        winners_file = st.file_uploader("Upload Winners Details Document", type=['jpg','png','jpeg'], accept_multiple_files=True)
+
+    submit = st.form_submit_button("🚀 Generate Both Compiled Reports & Media Packages", use_container_width=True)
+
+# --- 4. DATA COMPILATION ENGINE LOGIC ---
+if submit:
+    unselected_docs = []
+    if att_a == "-- Select Status --": unselected_docs.append("Brochure/Circular")
+    if att_b == "-- Select Status --": unselected_docs.append("Photos")
+    if att_c == "-- Select Status --": unselected_docs.append("List of Participants with signatures")
+    if att_d == "-- Select Status --": unselected_docs.append("Certificates Issued (with title and date)")
+    if att_e == "-- Select Status --": unselected_docs.append("Winners’ details (If Competition)")
+
+    if form_dept == "-- Select Department --":
+        st.error("Form Validation Error: Please select an explicit Department/Cell.")
+    elif academic_year == "-- Select Academic Year --":
+        st.error("Form Validation Error: Please select the explicit Academic Year.")
+    elif not event_title.strip():
+        st.error("Form Validation Error: Event Title cannot be blank.")
+    elif not raw_notes.strip():
+        st.error("Form Validation Error: Narrative context notes are required!")
+    elif unselected_docs:
+        st.error(f"Form Validation Error: Please select either 'Attached' or 'NA' for the following items: {', '.join(unselected_docs)}")
     else:
-        structured_report += "Not specified."
+        try:
+            with st.spinner("AI Processing System executing template compilation layers..."):
+                iqac_rep = generate_ai_content("Narrative", raw_notes, style="formal")
+                obj = generate_ai_content("Objectives", raw_notes, style="formal")
+                out = generate_ai_content("Learning Outcomes", raw_notes, style="formal")
+                sm_rep = generate_ai_content("Social Media", raw_notes, dept_name=form_dept, title_text=event_title.strip(), style="social")
+
+            def create_doc(template_path, is_iqac=True):
+                doc = DocxTemplate(template_path)
+                
+                if form_dept in ["IQAC", "Research & Innovation"]:
+                    dynamic_dept_header = form_dept
+                else:
+                    dynamic_dept_header = f"Department of {form_dept}"
+                
+                ctx = {
+                    'event_title': str(event_title).strip(),
+                    'event_date': event_date.strftime("%d-%m-%Y"),
+                    'academic_year': str(academic_year),
+                    'organizer': str(organizer).strip(),
+                    'dept': str(form_dept), 
+                    'dept_header': dynamic_dept_header,  
+                    'participants': str(participants),
+                    'report_body': str(iqac_rep if is_iqac else sm_rep),
+                    'objectives': str(obj if is_iqac else ""),
+                    'outcomes': str(out if is_iqac else ""),
+                    
+                    'attach_a': str(att_a), 
+                    'attach_b': str(att_b), 
+                    'attach_c': str(att_c),
+                    'attach_d': str(att_d), 
+                    'attach_e': str(att_e),
+                    
+                    'brochure_img': "", 'attendance_img': "",
+                    'image_1': "", 'image_2': "", 'image_3': "",
+                    'image_4': "", 'image_5': "", 'image_6': ""
+                }
+                
+                if brochure_file: 
+                    ctx['brochure_img'] = InlineImage(doc, io.BytesIO(brochure_file.getvalue()), width=Inches(4.5))
+                if attendance_file: 
+                    ctx['attendance_img'] = InlineImage(doc, io.BytesIO(attendance_file.getvalue()), width=Inches(4.5))
+                if event_photos:
+                    for i, p in enumerate(event_photos[:6]): 
+                        ctx[f'image_{i+1}'] = InlineImage(doc, io.BytesIO(p.getvalue()), width=Inches(3.2))
+                
+                doc.render(ctx)
+                buf = io.BytesIO()
+                doc.save(buf)
+                buf.seek(0)
+                return buf
+
+            st.session_state.iqac_file = create_doc("Sample_Event_Report_Template.docx", is_iqac=True)
+            st.session_state.sm_file = create_doc("Social_Media_Report_Template.docx", is_iqac=False)
+            st.success("✅ Reports compiled and archived successfully!")
+
+        except Exception as e:
+            st.error(f"System Operational Exception: {e}")
+
+# --- 5. COMPILING THE DYNAMIC ZIP MEDIA DOWNLOAD LAYER ---
+if st.session_state.iqac_file and st.session_state.sm_file:
+    dl_col1, dl_col2, dl_col3 = st.columns(3)
+    
+    dl_col1.download_button(
+        label="⬇️ Download IQAC Word Report Doc",
+        data=st.session_state.iqac_file,
+        file_name=f"IQAC_Report_{event_title.replace(' ', '_')}.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        use_container_width=True
+    )
+    dl_col2.download_button(
+        label="⬇️ Download Social Media Compilation Doc",
+        data=st.session_state.sm_file,
+        file_name=f"Social_Media_Brief_{event_title.replace(' ', '_')}.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        use_container_width=True
+    )
+    
+    # --- AUTOMATED ZIP CONTAINER PACKAGING FOR IMAGES ---
+    if event_photos:
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            for idx, photo in enumerate(event_photos):
+                photo_bytes = photo.read()
+                file_ext = photo.name.split(".")[-1]
+                archive_name = f"Photo_{idx+1}.{file_ext}"
+                zip_file.writestr(archive_name, photo_bytes)
         
-    structured_report += "\n\nEVENT OUTCOMES\n"
-    if outcomes_output:
-        structured_report += "\n".join(outcomes_output)
+        zip_buffer.seek(0)
+        clean_folder_title = event_title.replace(" ", "_")
+        
+        dl_col3.download_button(
+            label="📦 Download Photos Zip Folder",
+            data=zip_buffer,
+            file_name=f"{clean_folder_title}.zip",
+            mime="application/zip",
+            use_container_width=True
+        )
     else:
-        structured_report += "Not specified."
-        
-    return structured_report
+        dl_col3.markdown("<button disabled style='width:100%; height:43px; border-radius:4px; background-color:#eaeaea; border:none; color:#aaa; font-weight:bold;'>No Photos Uploaded to Archive</button>", unsafe_allow_html=True)
 
-# =========================================================
-# 3. WORKSPACE DOCUMENT UPLOAD & STATUS TABS (EXACT LABELS)
-# =========================================================
-st.markdown('<div class="section-header">Institutional Verification Attachments</div>', unsafe_allow_html=True)
-
-# Dictionary to hold the dropdown selection data across tabs to preserve original functionality
-doc_status = {}
-
-tab_brochure, tab_photos, tab_participants, tab_certificates, tab_winners = st.tabs([
-    "Brochure/Circular",
-    "Photos",
-    "List of Participants with signatures",
-    "Certificates Issued (with title and date)",
-    "Winners’ details (If Competition)"
-])
-
-with tab_brochure:
-    uploaded_brochure = st.file_uploader("Upload Brochure or Circular", accept_multiple_files=True, key="brochure")
-    doc_status["Brochure/Circular"] = st.selectbox("Document Status:", ["Attached", "NA"], key="status_brochure")
-
-with tab_photos:
-    uploaded_photos = st.file_uploader("Upload Event Photos (JPG/PNG)", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="photos")
-    doc_status["Photos"] = st.selectbox("Document Status:", ["Attached", "NA"], key="status_photos")
-
-with tab_participants:
-    uploaded_participants = st.file_uploader("Upload Signed Participant Roster Lists", accept_multiple_files=True, key="participants")
-    doc_status["List of Participants with signatures"] = st.selectbox("Document Status:", ["Attached", "NA"], key="status_participants")
-
-with tab_certificates:
-    uploaded_certificates = st.file_uploader("Upload Sample Certificates Issued", accept_multiple_files=True, key="certificates")
-    doc_status["Certificates Issued (with title and date)"] = st.selectbox("Document Status:", ["Attached", "NA"], key="status_certificates")
-
-with tab_winners:
-    uploaded_winners = st.file_uploader("Upload Winner Breakdown Details", accept_multiple_files=True, key="winners")
-    doc_status["Winners’ details (If Competition)"] = st.selectbox("Document Status:", ["Attached", "NA"], key="status_winners")
-
-# =========================================================
-# 4. COMPILING REPORT & ZIP ARCHIVE ENGINE
-# =========================================================
-st.markdown("---")
-if st.button("Compile Event Document Package"):
-    if not event_title:
-        st.error("Action Blocked: Please specify a valid Event Title in the sidebar context manager.")
-    else:
-        # Build clean report without over-exaggeration or fluff words
-        final_report_text = process_report_content(raw_inputs, event_title)
-        
-        # Append the document checklist selections to the foot of the generated text block
-        final_report_text += "\n\n=========================================\n"
-        final_report_text += "IQAC VERIFICATION DOCUMENT CHECKLIST STATUS\n"
-        final_report_text += "=========================================\n"
-        for doc_name, status in doc_status.items():
-            final_report_text += f"{doc_name}: {status}\n"
-            
-        col_text, col_photos = st.columns(2)
-        
-        with col_text:
-            st.subheader("Structured Document Preview")
-            st.text_area("Text Output Window (Copy-Ready)", final_report_text, height=300)
-            
-            st.download_button(
-                label="Download Official Event Report (.txt)",
-                data=final_report_text,
-                file_name=f"Report_{event_title.replace(' ', '_')}.txt",
-                mime="text/plain"
-            )
-            
-        with col_photos:
-            st.subheader("Media Distribution Package")
-            if uploaded_photos:
-                st.success(f"Detected {len(uploaded_photos)} images uploaded in verification repository.")
-                
-                # --- MEMORY ZIP COMPRESSION ENGINE ---
-                zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                    for idx, photo in enumerate(uploaded_photos):
-                        photo_bytes = photo.read()
-                        file_ext = photo.name.split(".")[-1]
-                        archive_name = f"Photo_{idx+1}.{file_ext}"
-                        zip_file.writestr(archive_name, photo_bytes)
-                
-                zip_buffer.seek(0)
-                clean_folder_title = event_title.replace(" ", "_")
-                
-                # Download button for Photos Zip titled with Event Title
-                st.download_button(
-                    label="Download Photos Zip Folder",
-                    data=zip_buffer,
-                    file_name=f"{clean_folder_title}.zip",
-                    mime="application/zip"
-                )
-            else:
-                st.warning("No media assets found in the 'Photos' tab layout window.")
+st.markdown("<br><hr/><p style='text-align: center; font-size: 1.05em; font-weight: bold; color: #555;'>Developed by IQAC @ St. Mary's</p>", unsafe_allow_html=True)
