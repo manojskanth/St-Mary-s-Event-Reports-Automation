@@ -1,11 +1,18 @@
 import streamlit as st
 from docxtpl import DocxTemplate, InlineImage
-from docx.shared import Inches
+from docdocx.shared import Inches
 import google.generativeai as genai
 import datetime
 import io
 import re
 import zipfile
+import csv
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 
 # --- 1. CORE CONFIGURATION ---
 DEPARTMENTS = [
@@ -22,10 +29,66 @@ ACADEMIC_YEARS = [
     "2024-25", "2025-26", "2026-27", "2027-28", "2028-29", "2029-30"
 ]
 
-# Supported standard file extensions across the submission matrices
 ALLOWED_EXTENSIONS = ['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png']
+LOG_FILE_PATH = "report_generation_log.csv"
+TARGET_EMAIL = "manojkanth@stmaryscollege.in"
 
-# --- 2. AI ENGINE (Proportionate, Fluff-Free & Bulletless Prose) ---
+# Cleaned Google Sheet URL for secure iframe preview rendering
+GOOGLE_SHEET_EMBED_URL = "https://docs.google.com/spreadsheets/d/1VIQ7K0F9WveK2DDAnacw17nMiCq3ux803oqr7mVkvpo/edit?rm=minimal"
+
+# --- 2. AUTOMATED BACKGROUND UTILITIES (LOGGING & EMAIL) ---
+def write_audit_log(user_name, department, title_text):
+    file_exists = os.path.isfile(LOG_FILE_PATH)
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    with open(LOG_FILE_PATH, mode='a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["Timestamp", "Faculty In-Charge", "Department/Cell", "Event Title"])
+        writer.writerow([timestamp, user_name, department, title_text])
+
+def email_compiled_reports(event_title, dept_name, iqac_bytes, sm_bytes):
+    if "EMAIL_HOST_USER" not in st.secrets or "EMAIL_HOST_PASSWORD" not in st.secrets:
+        st.warning("⚠️ Email credentials missing from st.secrets. Reports saved locally only.")
+        return False
+        
+    try:
+        sender_email = st.secrets["EMAIL_HOST_USER"]
+        sender_password = st.secrets["EMAIL_HOST_PASSWORD"]
+        
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = TARGET_EMAIL
+        msg['Subject'] = f"Official Event Report Compiled: {event_title} [{dept_name}]"
+        
+        body = f"Please find attached the compiled event report documents generated on {datetime.date.today().strftime('%d-%m-%Y')}."
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # Attach IQAC Report
+        part_iqac = MIMEBase('application', 'octet-stream')
+        part_iqac.set_payload(iqac_bytes.getvalue())
+        encoders.encode_base64(part_iqac)
+        part_iqac.add_header('Content-Disposition', f'attachment; filename="IQAC_Report_{event_title.replace(" ", "_")}.docx"')
+        msg.attach(part_iqac)
+        
+        # Attach Social Media Report
+        part_sm = MIMEBase('application', 'octet-stream')
+        part_sm.set_payload(sm_bytes.getvalue())
+        encoders.encode_base64(part_sm)
+        part_sm.add_header('Content-Disposition', f'attachment; filename="Social_Media_Brief_{event_title.replace(" ", "_")}.docx"')
+        msg.attach(part_sm)
+        
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, TARGET_EMAIL, msg.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Mail Delivery Interruption: {e}")
+        return False
+
+# --- 3. AI ENGINE (Proportionate, Fluff-Free & Bulletless Prose) ---
 def generate_ai_content(section_name, notes, dept_name="", title_text="", style="formal"):
     model_name = 'gemini-2.5-flash-lite' 
     
@@ -55,14 +118,12 @@ def generate_ai_content(section_name, notes, dept_name="", title_text="", style=
     model = genai.GenerativeModel(model_name)
     response = model.generate_content(prompt)
     
-    # Strip asterisks and clean non-ASCII characters cleanly
     cleaned_text = re.sub(r'[^\x00-\x7F]+', ' ', response.text).replace("**", "").replace("*", "").strip()
     return cleaned_text
 
-# --- 3. UI LAYOUT MATRIX SETUP ---
+# --- 4. UI LAYOUT MATRIX SETUP ---
 st.set_page_config(page_title="St. Mary's Event Report Generator", layout="wide")
 
-# Custom Styling Parameters matching IQAC Institutional Guidelines
 st.markdown("""
     <style>
     div.stButton > button:first-child { background-color: #1F4E78; color: white; border-radius: 4px; }
@@ -81,11 +142,14 @@ with center_logo:
 st.markdown("<h1 style='font-size: 2.5em; text-align: center; margin-bottom: 0px;'>Event Report Generator</h1>", unsafe_allow_html=True)
 st.markdown("<hr style='margin:15px 0px;' />", unsafe_allow_html=True)
 
-# Initialize Session States
 if 'iqac_file' not in st.session_state:
     st.session_state.iqac_file = None
 if 'sm_file' not in st.session_state:
     st.session_state.sm_file = None
+
+# Integrated Google Spreadsheet View Container Panel
+with st.expander("📊 View Live Tracking Google Spreadsheet Blueprint Matrix", expanded=False):
+    st.components.v1.iframe(GOOGLE_SHEET_EMBED_URL, height=450, scrolling=True)
 
 with st.form("main_form"):
     st.subheader("1. Profile")
@@ -99,9 +163,17 @@ with st.form("main_form"):
         participants = st.number_input("No. of Participants", min_value=0, step=1)
         academic_year = st.selectbox("Select Academic Year", ["-- Select Academic Year --"] + ACADEMIC_YEARS)
 
-    raw_notes = st.text_area("Paste Event Notes / Narrative Data here", height=150)
+    placeholder_guidelines = (
+        "Please mention the following in bullet points:\n"
+        "# Where did event take place...\n"
+        "# mention activities/ competitions held\n"
+        "# Who were all involved in this?\n"
+        "# any chief guest/ resource person?\n"
+        "# any special attractions etc"
+    )
+    raw_notes = st.text_area("Paste Event Notes / Narrative Data here", placeholder=placeholder_guidelines, height=180)
 
-    # --- SECTION 2: SUPPORTING DOCUMENTS STATUS (COMPACT GRID) ---
+    # --- SECTION 2: SUPPORTING DOCUMENTS STATUS ---
     st.subheader("2. Supporting Documents Status")
     doc_options = ["-- Select Status --", "Attached", "NA"]
     
@@ -112,7 +184,7 @@ with st.form("main_form"):
     att_d = d_cols[3].selectbox("Certificates Issued (with title and date)", doc_options, key="status_cert")
     att_e = d_cols[4].selectbox("Winners’ details (If Competition)", doc_options, key="status_winners")
 
-    # --- SECTION 3: UPLOADS (5 EXPANDED MULTI-FORMAT CATEGORIES) ---
+    # --- SECTION 3: UPLOADS ---
     st.subheader("3. Uploads")
     up_col1, up_col2 = st.columns(2)
     with up_col1:
@@ -123,9 +195,9 @@ with st.form("main_form"):
         event_photos = st.file_uploader("Upload Photos", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
         certificates_file = st.file_uploader("Upload Certificates Issued (with title and date)", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
 
-    submit = st.form_submit_button("🚀 Generate Both Compiled Reports", use_container_width=True)
+    submit = st.form_submit_button("🚀 Generate Both Compiled Reports & Trigger Distributions", use_container_width=True)
 
-# --- 4. DATA COMPILATION ENGINE LOGIC ---
+# --- 5. DATA COMPILATION & BACKEND AUDIT TRIGGER ENGINE ---
 if submit:
     unselected_docs = []
     if att_a == "-- Select Status --": unselected_docs.append("Brochure/Circular")
@@ -146,7 +218,7 @@ if submit:
         st.error(f"Form Validation Error: Please select either 'Attached' or 'NA' for the following items: {', '.join(unselected_docs)}")
     else:
         try:
-            with st.spinner("AI Processing System executing template compilation layers..."):
+            with st.spinner("Executing system processes, logging session telemetry, and compiling reports..."):
                 iqac_rep = generate_ai_content("Narrative", raw_notes, style="formal")
                 obj = generate_ai_content("Objectives", raw_notes, style="formal")
                 out = generate_ai_content("Learning Outcomes", raw_notes, style="formal")
@@ -154,11 +226,7 @@ if submit:
 
             def create_doc(template_path, is_iqac=True):
                 doc = DocxTemplate(template_path)
-                
-                if form_dept in ["IQAC", "Research & Innovation"]:
-                    dynamic_dept_header = form_dept
-                else:
-                    dynamic_dept_header = f"Department of {form_dept}"
+                dynamic_dept_header = form_dept if form_dept in ["IQAC", "Research & Innovation"] else f"Department of {form_dept}"
                 
                 ctx = {
                     'event_title': str(event_title).strip(),
@@ -171,19 +239,10 @@ if submit:
                     'report_body': str(iqac_rep if is_iqac else sm_rep),
                     'objectives': str(obj if is_iqac else ""),
                     'outcomes': str(out if is_iqac else ""),
-                    
-                    'attach_a': str(att_a), 
-                    'attach_b': str(att_b), 
-                    'attach_c': str(att_c),
-                    'attach_d': str(att_d), 
-                    'attach_e': str(att_e),
-                    
-                    'brochure_img': "", 'attendance_img': "",
-                    'image_1': "", 'image_2': "", 'image_3': "",
-                    'image_4': "", 'image_5': "", 'image_6': ""
+                    'attach_a': str(att_a), 'attach_b': str(att_b), 'attach_c': str(att_c), 'attach_d': str(att_d), 'attach_e': str(att_e),
+                    'brochure_img': "", 'attendance_img': "", 'image_1': "", 'image_2': "", 'image_3': "", 'image_4': "", 'image_5': "", 'image_6': ""
                 }
                 
-                # Render logic checks file extension to dynamically place layout images safely into the DOCX Template
                 if brochure_file and brochure_file.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png']: 
                     ctx['brochure_img'] = InlineImage(doc, io.BytesIO(brochure_file.getvalue()), width=Inches(4.5))
                 if attendance_file and attendance_file.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png']: 
@@ -204,12 +263,20 @@ if submit:
 
             st.session_state.iqac_file = create_doc("Sample_Event_Report_Template.docx", is_iqac=True)
             st.session_state.sm_file = create_doc("Social_Media_Report_Template.docx", is_iqac=False)
-            st.success("✅ Both reports generated seamlessly and packaged successfully!")
+            
+            write_audit_log(organizer, form_dept, event_title)
+            st.info(f"📊 Audit entry logged dynamically to clear path tracking repository file: {LOG_FILE_PATH}")
+            
+            mail_status = email_compiled_reports(event_title, form_dept, st.session_state.iqac_file, st.session_state.sm_file)
+            if mail_status:
+                st.success(f"📧 Reports systematically distributed and emailed to {TARGET_EMAIL} flawlessly!")
+            
+            st.success("✅ Processes finalized successfully!")
 
         except Exception as e:
             st.error(f"System Operational Exception: {e}")
 
-# --- 5. COMPILING MULTI-FILE AND ZIP DOWNLOAD LAYERS ---
+# --- 6. ASSET DOWNLOAD ROUTINES ---
 if st.session_state.iqac_file and st.session_state.sm_file:
     dl_col1, dl_col2, dl_col3 = st.columns(3)
     
@@ -228,14 +295,12 @@ if st.session_state.iqac_file and st.session_state.sm_file:
         use_container_width=True
     )
     
-    # --- AUTOMATED ZIP ARCHIVE DOWNLOAD FOR PHOTO ASSETS ---
     if event_photos:
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
             for idx, file_asset in enumerate(event_photos):
                 file_bytes = file_asset.read()
                 file_ext = file_asset.name.split(".")[-1]
-                # Keeps the exact file naming extension cleanly mapped inside the folder
                 archive_name = f"Document_{idx+1}.{file_ext}"
                 zip_file.writestr(archive_name, file_bytes)
         
