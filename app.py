@@ -6,8 +6,6 @@ import datetime
 import io
 import re
 import zipfile
-import gspread
-from google.oauth2.service_account import Credentials
 
 # --- 1. CORE CONFIGURATION ---
 DEPARTMENTS = [
@@ -24,54 +22,10 @@ ACADEMIC_YEARS = [
     "2024-25", "2025-26", "2026-27", "2027-28", "2028-29", "2029-30"
 ]
 
+# Universal multi-format extension allowance (PDF, Word, Images)
 ALLOWED_EXTENSIONS = ['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png']
-SPREADSHEET_ID = "1VIQ7K0F9WveK2DDAnacw17nMiCq3ux803oqr7mVkvpo"
 
-# --- 2. LIVE GOOGLE SPREADSHEET TELEMETRY LOGGING SYSTEM ---
-def append_google_sheet_log(user_name, department, title_text):
-    """Authenticates using the exact single-line parsing style from the Research Portal."""
-    try:
-        if "gspread" not in st.secrets:
-            st.error("Configuration Error: '[gspread]' section missing from secrets dashboard.")
-            return False
-            
-        sec = st.secrets["gspread"]
-        
-        # Exact extraction logic used in working portals to parse string literals natively
-        parsed_key = str(sec["private_key"]).replace("\\n", "\n").strip()
-        
-        credentials_dict = {
-            "type": str(sec["type"]),
-            "project_id": str(sec["project_id"]),
-            "private_key_id": str(sec["private_key_id"]),
-            "private_key": parsed_key,
-            "client_email": str(sec["client_email"]),
-            "client_id": str(sec["client_id"]),
-            "auth_uri": str(sec["auth_uri"]),
-            "token_uri": str(sec["token_uri"]),
-            "auth_provider_x509_cert_url": str(sec["auth_provider_x509_cert_url"]),
-            "client_x509_cert_url": str(sec["client_x509_cert_url"])
-        }
-        
-        scope = ["https://www.googleapis.com/auth/spreadsheets"]
-        creds = Credentials.from_service_account_info(credentials_dict, scopes=scope)
-        client = gspread.authorize(creds)
-        
-        workbook = client.open_by_key(SPREADSHEET_ID)
-        sheet = workbook.get_worksheet(0) 
-        
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        if len(sheet.get_all_values()) == 0:
-            sheet.append_row(["Timestamp", "Faculty In-Charge", "Department/Cell", "Event Title"])
-            
-        sheet.append_row([timestamp, user_name, department, title_text])
-        return True
-    except Exception as e:
-        st.error(f"⚠️ Spreadsheet Writing Disruption: {e}")
-        return False
-
-# --- 3. AI ENGINE (Proportionate, Fluff-Free & Bulletless Prose with Error Safety) ---
+# --- 2. AI ENGINE (Proportionate, Fluff-Free & Bulletless Prose with Error Safety) ---
 def generate_ai_content(section_name, notes, dept_name="", title_text="", style="formal"):
     model_name = 'gemini-2.5-flash-lite' 
     
@@ -113,7 +67,7 @@ def generate_ai_content(section_name, notes, dept_name="", title_text="", style=
             st.error(f"AI Generation Interruption: {e}")
             st.stop()
 
-# --- 4. UI LAYOUT MATRIX SETUP ---
+# --- 3. UI LAYOUT MATRIX SETUP ---
 st.set_page_config(page_title="St. Mary's Event Report Generator", layout="wide")
 
 st.markdown("""
@@ -139,7 +93,7 @@ if 'iqac_file' not in st.session_state:
 if 'sm_file' not in st.session_state:
     st.session_state.sm_file = None
 
-# --- 5. MAIN FORM INPUT SECTION ---
+# --- 4. MAIN FORM INPUT SECTION ---
 with st.form("main_form"):
     st.subheader("1. Profile")
     c1, c2 = st.columns(2)
@@ -184,9 +138,9 @@ with st.form("main_form"):
         event_photos = st.file_uploader("Upload Photos", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
         certificates_file = st.file_uploader("Upload Certificates Issued (with title and date)", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
 
-    submit = st.form_submit_button("🚀 Generate Both Compiled Reports & Sync Log Metrics", use_container_width=True)
+    submit = st.form_submit_button("🚀 Generate Both Compiled Reports", use_container_width=True)
 
-# --- 6. DATA PROCESSING AND ENGINE TRIGGERS ---
+# --- 5. DATA COMPILATION PIPELINE ---
 if submit:
     unselected_docs = []
     if att_a == "-- Select Status --": unselected_docs.append("Brochure/Circular")
@@ -207,7 +161,7 @@ if submit:
         st.error(f"Form Validation Error: Please select either 'Attached' or 'NA' for the following items: {', '.join(unselected_docs)}")
     else:
         try:
-            with st.spinner("Executing system processes, compiling layout documents, and syncing logs..."):
+            with st.spinner("Executing system processes, compiling layout documents..."):
                 iqac_rep = generate_ai_content("Narrative", raw_notes, style="formal")
                 obj = generate_ai_content("Objectives", raw_notes, style="formal")
                 out = generate_ai_content("Learning Outcomes", raw_notes, style="formal")
@@ -253,17 +207,12 @@ if submit:
             st.session_state.iqac_file = create_doc("Sample_Event_Report_Template.docx", is_iqac=True)
             st.session_state.sm_file = create_doc("Social_Media_Report_Template.docx", is_iqac=False)
             
-            # Execute logging sequence
-            sheet_sync = append_google_sheet_log(organizer, form_dept, event_title)
-            if sheet_sync:
-                st.success("📊 Live usage metrics systematically logged to Google Sheets!")
-            
-            st.success("✅ Document compilation finalized successfully!")
+            st.success("✅ Both institutional documents compiled successfully!")
 
         except Exception as e:
             st.error(f"System Operational Exception: {e}")
 
-# --- 7. FILE ASSET DOWNLOAD MATRIX LAYERS ---
+# --- 6. FILE ASSET DOWNLOAD MATRIX LAYERS ---
 if st.session_state.iqac_file and st.session_state.sm_file:
     dl_col1, dl_col2, dl_col3 = st.columns(3)
     
