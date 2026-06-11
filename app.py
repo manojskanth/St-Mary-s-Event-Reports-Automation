@@ -29,7 +29,7 @@ SPREADSHEET_ID = "1VIQ7K0F9WveK2DDAnacw17nMiCq3ux803oqr7mVkvpo"
 
 # --- 2. LIVE GOOGLE SPREADSHEET TELEMETRY LOGGING SYSTEM ---
 def append_google_sheet_log(user_name, department, title_text):
-    """Authenticates using the raw multi-line string configuration directly."""
+    """Authenticates using the exact single-line parsing style from the Research Portal."""
     try:
         if "gspread" not in st.secrets:
             st.error("Configuration Error: '[gspread]' section missing from secrets dashboard.")
@@ -37,11 +37,14 @@ def append_google_sheet_log(user_name, department, title_text):
             
         sec = st.secrets["gspread"]
         
+        # Exact extraction logic used in working portals to parse string literals natively
+        parsed_key = str(sec["private_key"]).replace("\\n", "\n").strip()
+        
         credentials_dict = {
             "type": str(sec["type"]),
             "project_id": str(sec["project_id"]),
             "private_key_id": str(sec["private_key_id"]),
-            "private_key": str(sec["private_key"]),
+            "private_key": parsed_key,
             "client_email": str(sec["client_email"]),
             "client_id": str(sec["client_id"]),
             "auth_uri": str(sec["auth_uri"]),
