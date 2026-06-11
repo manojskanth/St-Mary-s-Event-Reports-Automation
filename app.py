@@ -24,22 +24,31 @@ ACADEMIC_YEARS = [
     "2024-25", "2025-26", "2026-27", "2027-28", "2028-29", "2029-30"
 ]
 
+# Comprehensive multi-format extension matrix allowance (PDF, Word, Images)
 ALLOWED_EXTENSIONS = ['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png']
 SPREADSHEET_ID = "1VIQ7K0F9WveK2DDAnacw17nMiCq3ux803oqr7mVkvpo"
 
 # --- 2. LIVE GOOGLE SPREADSHEET TELEMETRY LOGGING SYSTEM ---
 def append_google_sheet_log(user_name, department, title_text):
-    """Securely authenticates and appends usage analytics rows using explicit raw string conversions."""
+    """Securely authenticates and appends usage analytics rows with an automatic PEM string repair layer."""
     try:
         if "gspread" not in st.secrets:
             st.error("Configuration Error: '[gspread]' section missing from secrets dashboard.")
             return False
             
-        # Extract secrets parameters dictionary safely
         sec = st.secrets["gspread"]
         
-        # Explicit clean-up parsing wrapper to protect RSA line breaks from TOML interpretation mismatches
-        raw_key = str(sec["private_key"]).replace("\\n", "\n")
+        # --- ROBUST CHARACTER CLEANING FILTER ---
+        # Forces clean-up parsing to protect RSA keys from manual copy-paste character corruption
+        raw_key = str(sec["private_key"])
+        raw_key = raw_key.replace("\\n", "\n")
+        raw_key = raw_key.replace("\\", "").replace('"', '').strip()
+        
+        # Enforce exact envelope bounds if trailing blocks were clipped
+        if not raw_key.startswith("-----BEGIN PRIVATE KEY-----"):
+            raw_key = "-----BEGIN PRIVATE KEY-----\n" + raw_key
+        if not raw_key.endswith("-----END PRIVATE KEY-----"):
+            raw_key = raw_key + "\n-----END PRIVATE KEY-----"
         
         credentials_dict = {
             "type": str(sec["type"]),
@@ -58,20 +67,19 @@ def append_google_sheet_log(user_name, department, title_text):
         creds = Credentials.from_service_account_info(credentials_dict, scopes=scope)
         client = gspread.authorize(creds)
         
-        # Connect to master workbook tracking sheet
+        # Target the very first sheet tab index natively
         workbook = client.open_by_key(SPREADSHEET_ID)
         sheet = workbook.get_worksheet(0) 
         
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # If worksheet is completely unpopulated, establish headers
+        # If worksheet layout is fresh and unpopulated, insert system headers
         if len(sheet.get_all_values()) == 0:
             sheet.append_row(["Timestamp", "Faculty In-Charge", "Department/Cell", "Event Title"])
             
         sheet.append_row([timestamp, user_name, department, title_text])
         return True
     except Exception as e:
-        # Prints complete detailed exception tracking text array directly to page layer for debugging
         st.error(f"⚠️ Spreadsheet Writing Disruption: {e}")
         return False
 
@@ -143,6 +151,7 @@ if 'iqac_file' not in st.session_state:
 if 'sm_file' not in st.session_state:
     st.session_state.sm_file = None
 
+# --- 5. MAIN FORM INPUT SECTION ---
 with st.form("main_form"):
     st.subheader("1. Profile")
     c1, c2 = st.columns(2)
@@ -155,6 +164,7 @@ with st.form("main_form"):
         participants = st.number_input("No. of Participants", min_value=0, step=1)
         academic_year = st.selectbox("Select Academic Year", ["-- Select Academic Year --"] + ACADEMIC_YEARS)
 
+    # Custom Multi-Line Transparent Help Prompt Box
     placeholder_guidelines = (
         "Please mention the following in bullet points:\n"
         "# Where did event take place...\n"
@@ -176,7 +186,7 @@ with st.form("main_form"):
     att_d = d_cols[3].selectbox("Certificates Issued (with title and date)", doc_options, key="status_cert")
     att_e = d_cols[4].selectbox("Winners’ details (If Competition)", doc_options, key="status_winners")
 
-    # --- SECTION 3: UPLOADS ---
+    # --- SECTION 3: UPLOADS (5 EXPANDED MULTI-FORMAT CATEGORIES) ---
     st.subheader("3. Uploads")
     up_col1, up_col2 = st.columns(2)
     with up_col1:
@@ -189,7 +199,7 @@ with st.form("main_form"):
 
     submit = st.form_submit_button("🚀 Generate Both Compiled Reports & Sync Log Metrics", use_container_width=True)
 
-# --- 5. DATA COMPILATION & CLOUD RECORD LOG BLOCK ENGINE ---
+# --- 6. DATA PROCESSING AND ENGINE TRIGGERS ---
 if submit:
     unselected_docs = []
     if att_a == "-- Select Status --": unselected_docs.append("Brochure/Circular")
@@ -210,7 +220,7 @@ if submit:
         st.error(f"Form Validation Error: Please select either 'Attached' or 'NA' for the following items: {', '.join(unselected_docs)}")
     else:
         try:
-            with st.spinner("Executing system processes, formatting template packages, and syncing spreadsheet metric logs..."):
+            with st.spinner("Executing system processes, compiling layout documents, and syncing logs..."):
                 iqac_rep = generate_ai_content("Narrative", raw_notes, style="formal")
                 obj = generate_ai_content("Objectives", raw_notes, style="formal")
                 out = generate_ai_content("Learning Outcomes", raw_notes, style="formal")
@@ -256,7 +266,7 @@ if submit:
             st.session_state.iqac_file = create_doc("Sample_Event_Report_Template.docx", is_iqac=True)
             st.session_state.sm_file = create_doc("Social_Media_Report_Template.docx", is_iqac=False)
             
-            # Execute logging sequence
+            # Executing spreadsheet logging write operation
             sheet_sync = append_google_sheet_log(organizer, form_dept, event_title)
             if sheet_sync:
                 st.success("📊 Live usage metrics systematically logged to Google Sheets!")
@@ -266,7 +276,7 @@ if submit:
         except Exception as e:
             st.error(f"System Operational Exception: {e}")
 
-# --- 6. DOWNLOAD BUTTON CONTAINER ASSET ROUTINES ---
+# --- 7. ASSET DOWNLOAD LAYERS ---
 if st.session_state.iqac_file and st.session_state.sm_file:
     dl_col1, dl_col2, dl_col3 = st.columns(3)
     
