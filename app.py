@@ -7,7 +7,6 @@ import io
 import re
 import zipfile
 import gspread
-import base64
 from google.oauth2.service_account import Credentials
 
 # --- 1. CORE CONFIGURATION ---
@@ -30,56 +29,19 @@ SPREADSHEET_ID = "1VIQ7K0F9WveK2DDAnacw17nMiCq3ux803oqr7mVkvpo"
 
 # --- 2. LIVE GOOGLE SPREADSHEET TELEMETRY LOGGING SYSTEM ---
 def append_google_sheet_log(user_name, department, title_text):
-    """Securely authenticates using a multi-stage fallback engine to completely bypass PEM loading errors."""
+    """Authenticates using the raw multi-line string configuration directly."""
     try:
         if "gspread" not in st.secrets:
             st.error("Configuration Error: '[gspread]' section missing from secrets dashboard.")
             return False
             
         sec = st.secrets["gspread"]
-        final_pem_key = None
-
-        # --- FALLBACK LAYER 1: MULTI-LINE TRIPLE QUOTE ENVELOPE CHECK ---
-        if "private_key" in sec and "-----BEGIN PRIVATE KEY-----" in str(sec["private_key"]):
-            final_pem_key = str(sec["private_key"]).replace("\\n", "\n").strip()
-            # Clean up potential accidental enclosing quote marks from formatting
-            if final_pem_key.startswith('"') and final_pem_key.endswith('"'):
-                final_pem_key = final_pem_key[1:-1].strip()
-            if final_pem_key.startswith("'") and final_pem_key.endswith("'"):
-                final_pem_key = final_pem_key[1:-1].strip()
-
-        # --- FALLBACK LAYER 2: CLEAN BASE64 STRING ENCODING ENGINE ---
-        elif "private_key_base64" in sec:
-            base64_str = str(sec["private_key_base64"]).strip()
-            # Strip accidental nested text wrapper strings
-            base64_str = base64_str.replace('"', '').replace("'", "").replace("\\", "")
-            base64_str = re.sub(r'[^A-Za-z0-9+/=]', '', base64_str)
-            
-            try:
-                decoded_bytes = base64.b64decode(base64_str)
-                inner_key_content = decoded_bytes.decode("utf-8", errors="ignore").strip()
-                
-                if "BEGIN PRIVATE KEY" not in inner_key_content:
-                    final_pem_key = (
-                        "-----BEGIN PRIVATE KEY-----\n"
-                        f"{inner_key_content}\n"
-                        "-----END PRIVATE KEY-----\n"
-                    )
-                else:
-                    final_pem_key = inner_key_content
-            except Exception:
-                pass
-
-        # If both extraction engines fail to parse a structural layout, throw a safe structural block guide
-        if not final_pem_key:
-            st.error("🔒 Cryptography Alert: The 'private_key' text layout formatting could not be mapped safely. Please verify your secrets window alignment structure.")
-            return False
-            
+        
         credentials_dict = {
             "type": str(sec["type"]),
             "project_id": str(sec["project_id"]),
             "private_key_id": str(sec["private_key_id"]),
-            "private_key": final_pem_key,
+            "private_key": str(sec["private_key"]),
             "client_email": str(sec["client_email"]),
             "client_id": str(sec["client_id"]),
             "auth_uri": str(sec["auth_uri"]),
