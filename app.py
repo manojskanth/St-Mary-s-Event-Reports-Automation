@@ -1,6 +1,6 @@
 import streamlit as st
 from docxtpl import DocxTemplate, InlineImage
-from docdocx.shared import Inches
+from docx.shared import Inches
 import google.generativeai as genai
 import datetime
 import io
