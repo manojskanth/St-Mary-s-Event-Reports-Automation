@@ -176,7 +176,7 @@ if submit:
                 doc = DocxTemplate(template_path)
                 dynamic_dept_header = form_dept if form_dept in ["IQAC", "Research & Innovation"] else f"Department of {form_dept}"
                 
-                # Check absolute validation for optional fields before passing layout logic tokens
+                # Check validation for optional fields
                 has_winners = (att_e == "Attached") and bool(winners_file)
                 has_certs = (att_d == "Attached") and bool(certificates_file)
 
@@ -193,11 +193,11 @@ if submit:
                     'outcomes': str(out if is_iqac else ""),
                     'attach_a': str(att_a), 'attach_b': str(att_b), 'attach_c': str(att_c), 'attach_d': str(att_d), 'attach_e': str(att_e),
                     'brochure_img': "", 'attendance_img': "",
-                    'winners_uploaded': has_winners,       # Structural conditional logic gates
-                    'certs_uploaded': has_certs            # Structural conditional logic gates
+                    'winners_uploaded': has_winners,       
+                    'certs_uploaded': has_certs            
                 }
                 
-                # Pre-initialize dynamic tracking context items securely
+                # Pre-initialize tracking context dictionary keys securely
                 for i in range(1, 11):
                     ctx[f'attendance_img_{i}'] = ""
                     ctx[f'winners_img_{i}'] = ""
@@ -255,7 +255,7 @@ if submit:
                 buf.seek(0)
                 return buf
 
-            st.session_state.iqac_file = create_doc("Sample_Event_Report_Template_Final.docx", is_iqac=True)
+            st.session_state.iqac_file = create_doc("Sample_Event_Report_Template.docx", is_iqac=True)
             st.session_state.sm_file = create_doc("Social_Media_Report_Template.docx", is_iqac=False)
             
             st.success("✅ Both institutional documents compiled successfully!")
