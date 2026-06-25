@@ -48,7 +48,7 @@ def generate_ai_content(section_name, notes, dept_name="", title_text="", style=
         )
     else: # IQAC Narrative
         rules = (
-            "Formal academic summary. STRICT LIMIT: Max 150 words. No intro fluff or placeholder text. "
+            "Formal academic academic summary. STRICT LIMIT: Max 150 words. No intro fluff or placeholder text. "
             "Keep content strictly proportionate to inputs provided without exaggerating or hallucinating additional events."
         )
 
@@ -139,7 +139,9 @@ with st.form("main_form"):
         attendance_file = st.file_uploader("Upload List of Participants with signatures", type=ALLOWED_EXTENSIONS)
         winners_file = st.file_uploader("Upload Winners’ details (If Competition)", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
     with up_col2:
-        event_photos = st.file_uploader("Upload Photos", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
+        # Split photo uploads into Non-Geotag and Geotag files layout blocks
+        non_geotag_photos = st.file_uploader("Upload Non-Geotag Photos", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
+        geotag_photos = st.file_uploader("Upload GeoTag Photos", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
         certificates_file = st.file_uploader("Upload Certificates Issued (with title and date)", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
 
     submit = st.form_submit_button("🚀 Generate Both Compiled Reports", use_container_width=True)
@@ -195,9 +197,16 @@ if submit:
                 if attendance_file and attendance_file.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png']: 
                     ctx['attendance_img'] = InlineImage(doc, io.BytesIO(attendance_file.getvalue()), width=Inches(4.5))
                 
-                if event_photos:
+                # Combine both Non-Geotag and Geotag files array matrix for the Word rendering block structure
+                combined_photos = []
+                if non_geotag_photos:
+                    combined_photos.extend(non_geotag_photos)
+                if geotag_photos:
+                    combined_photos.extend(geotag_photos)
+
+                if combined_photos:
                     img_idx = 1
-                    for p in event_photos:
+                    for p in combined_photos:
                         if p.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png'] and img_idx <= 6:
                             ctx[f'image_{img_idx}'] = InlineImage(doc, io.BytesIO(p.getvalue()), width=Inches(3.2))
                             img_idx += 1
@@ -235,26 +244,28 @@ if st.session_state.iqac_file and st.session_state.sm_file:
         use_container_width=True
     )
     
-    if event_photos:
+    # Check explicitly if Non-Geotag photos exist to package into zip
+    if non_geotag_photos:
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-            for idx, file_asset in enumerate(event_photos):
+            for idx, file_asset in enumerate(non_geotag_photos):
                 file_bytes = file_asset.read()
                 file_ext = file_asset.name.split(".")[-1]
                 archive_name = f"Document_{idx+1}.{file_ext}"
                 zip_file.writestr(archive_name, file_bytes)
+                file_asset.seek(0)  # Reset pointer to avoid breaking future form processing runs
         
         zip_buffer.seek(0)
         clean_folder_title = event_title.replace(" ", "_")
         
         dl_col3.download_button(
-            label="📦 Download Photos Zip Folder",
+            label="📦 Download Non-GeoTag Photos Zip Folder",
             data=zip_buffer,
-            file_name=f"{clean_folder_title}.zip",
+            file_name=f"{clean_folder_title}_NonGeotag.zip",
             mime="application/zip",
             use_container_width=True
         )
     else:
-        dl_col3.markdown("<button disabled style='width:100%; height:43px; border-radius:4px; background-color:#eaeaea; border:none; color:#aaa; font-weight:bold;'>No Photos Uploaded to Archive</button>", unsafe_allow_html=True)
+        dl_col3.markdown("<button disabled style='width:100%; height:43px; border-radius:4px; background-color:#eaeaea; border:none; color:#aaa; font-weight:bold;'>No Non-Geotag Photos to Archive</button>", unsafe_allow_html=True)
 
 st.markdown("<br><hr/><p style='text-align: center; font-size: 1.05em; font-weight: bold; color: #555;'>Developed by IQAC @ St. Mary's</p>", unsafe_allow_html=True)
