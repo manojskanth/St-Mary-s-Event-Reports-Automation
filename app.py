@@ -6,6 +6,7 @@ import datetime
 import io
 import re
 import zipfile
+import os  # Imported for bulletproof path resolution
 
 # --- 1. CORE CONFIGURATION ---
 DEPARTMENTS = [
@@ -84,7 +85,10 @@ st.markdown("""
 left_pad, center_logo, right_pad = st.columns([1.8, 0.5, 1.8])
 with center_logo:
     try:
-        with open("logo.png", "rb") as image_file:
+        # Resolve path for logo
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_path = os.path.join(current_dir, "logo.png")
+        with open(logo_path, "rb") as image_file:
             st.image(image_file.read(), use_container_width=True)
     except Exception:
         st.markdown("<h3 style='text-align: center; color: #1F4E78;'>🏫 St. Mary's College</h3>", unsafe_allow_html=True)
@@ -176,7 +180,6 @@ if submit:
                 doc = DocxTemplate(template_path)
                 dynamic_dept_header = form_dept if form_dept in ["IQAC", "Research & Innovation"] else f"Department of {form_dept}"
                 
-                # Strict validation status tracking
                 has_attendance = (att_c == "Attached") and bool(attendance_files)
                 has_certs = (att_d == "Attached") and bool(certificates_file)
                 has_winners = (att_e == "Attached") and bool(winners_file)
@@ -195,11 +198,10 @@ if submit:
                     'attach_a': str(att_a), 'attach_b': str(att_b), 'attach_c': str(att_c), 'attach_d': str(att_d), 'attach_e': str(att_e),
                     'brochure_img': "", 
                     'attendance_uploaded': has_attendance, 
-                    'certificates_uploaded': has_certs, # FIXED: Changed from certs_uploaded to match your .docx exactly!
+                    'certificates_uploaded': has_certs, 
                     'winners_uploaded': has_winners       
                 }
                 
-                # Pre-initialize dictionary workspace elements cleanly
                 for i in range(1, 11):
                     ctx[f'attendance_img_{i}'] = ""
                     ctx[f'certificate_img_{i}'] = ""
@@ -207,11 +209,9 @@ if submit:
                 for i in range(1, 7):
                     ctx[f'image_{i}'] = ""
                 
-                # 1. Brochure Image Pass
                 if brochure_file and brochure_file.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png']: 
                     ctx['brochure_img'] = InlineImage(doc, io.BytesIO(brochure_file.getvalue()), width=Inches(4.5))
                 
-                # 2. Multi-Attendance Image Pass
                 if has_attendance:
                     att_idx = 1
                     for att_f in attendance_files:
@@ -219,7 +219,6 @@ if submit:
                             ctx[f'attendance_img_{att_idx}'] = InlineImage(doc, io.BytesIO(att_f.getvalue()), width=Inches(4.5))
                             att_idx += 1
 
-                # 3. Multi-Certificates Image Pass
                 if has_certs:
                     cert_idx = 1
                     for cert_f in certificates_file:
@@ -227,7 +226,6 @@ if submit:
                             ctx[f'certificate_img_{cert_idx}'] = InlineImage(doc, io.BytesIO(cert_f.getvalue()), width=Inches(4.5))
                             cert_idx += 1
 
-                # 4. Multi-Winners List Image Pass
                 if has_winners:
                     win_idx = 1
                     for win_f in winners_file:
@@ -235,7 +233,6 @@ if submit:
                             ctx[f'winners_img_{win_idx}'] = InlineImage(doc, io.BytesIO(win_f.getvalue()), width=Inches(4.5))
                             win_idx += 1
                 
-                # 5. Combined Photo Display Map
                 combined_photos = []
                 if non_geotag_photos:
                     combined_photos.extend(non_geotag_photos)
@@ -255,8 +252,13 @@ if submit:
                 buf.seek(0)
                 return buf
 
-            st.session_state.iqac_file = create_doc("Sample_Event_Report_Template.docx", is_iqac=True)
-            st.session_state.sm_file = create_doc("Social_Media_Report_Template.docx", is_iqac=False)
+            # DYNAMIC RESOLUTION OF CURRENT FOLDER PATHS
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            iqac_template_path = os.path.join(current_dir, "Sample_Event_Report_Template.docx")
+            sm_template_path = os.path.join(current_dir, "Social_Media_Report_Template.docx")
+
+            st.session_state.iqac_file = create_doc(iqac_template_path, is_iqac=True)
+            st.session_state.sm_file = create_doc(sm_template_path, is_iqac=False)
             
             st.success("✅ Both institutional documents compiled successfully!")
 
