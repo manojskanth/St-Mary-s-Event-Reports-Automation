@@ -224,7 +224,7 @@ if submit:
                 buf.seek(0)
                 return buf
 
-            st.session_state.iqac_file = create_doc("Sample_Event_Report_Template.docx", is_iqac=True)
+            st.session_state.iqac_file = create_doc("Sample_Event_Report_Template_Final.docx", is_iqac=True)
             st.session_state.sm_file = create_doc("Social_Media_Report_Template.docx", is_iqac=False)
             
             st.success("✅ Both institutional documents compiled successfully!")
