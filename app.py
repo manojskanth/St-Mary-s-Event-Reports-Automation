@@ -144,7 +144,7 @@ with st.form("main_form"):
         geotag_photos = st.file_uploader("Upload GeoTag Photos", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
         certificates_file = st.file_uploader("Upload Certificates Issued (with title and date)", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
 
-    submit = st.form_submit_button("🚀 Generate Event Report, Social Media Report, and ZIP folder", use_container_width=True)
+   submit = st.form_submit_button("🚀 Generate Event Report, Social Media Report, and ZIP folder", use_container_width=True)
 
 # --- 5. DATA COMPILATION PIPELINE ---
 if submit:
