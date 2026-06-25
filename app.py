@@ -139,7 +139,7 @@ with st.form("main_form"):
         attendance_file = st.file_uploader("Upload List of Participants with signatures", type=ALLOWED_EXTENSIONS)
         winners_file = st.file_uploader("Upload Winners’ details (If Competition)", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
     with up_col2:
-        non_geotag_photos = st.file_uploader("Upload Non-Geotag Photos", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
+        non_geotag_photos = st.file_uploader("Upload Non-GeoTag Photos", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
         geotag_photos = st.file_uploader("Upload GeoTag Photos", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
         certificates_file = st.file_uploader("Upload Certificates Issued (with title and date)", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
 
