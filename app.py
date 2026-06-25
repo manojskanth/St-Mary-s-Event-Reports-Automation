@@ -176,10 +176,10 @@ if submit:
                 doc = DocxTemplate(template_path)
                 dynamic_dept_header = form_dept if form_dept in ["IQAC", "Research & Innovation"] else f"Department of {form_dept}"
                 
-                # Rigid logic verification gate mappings
+                # Strict validation status tracking
                 has_attendance = (att_c == "Attached") and bool(attendance_files)
-                has_winners = (att_e == "Attached") and bool(winners_file)
                 has_certs = (att_d == "Attached") and bool(certificates_file)
+                has_winners = (att_e == "Attached") and bool(winners_file)
 
                 ctx = {
                     'event_title': str(event_title).strip(),
@@ -193,51 +193,49 @@ if submit:
                     'objectives': str(obj if is_iqac else ""),
                     'outcomes': str(out if is_iqac else ""),
                     'attach_a': str(att_a), 'attach_b': str(att_b), 'attach_c': str(att_c), 'attach_d': str(att_d), 'attach_e': str(att_e),
-                    'brochure_img': "", 'attendance_img': "",
-                    'attendance_uploaded': has_attendance, # Strict gate boolean
-                    'winners_uploaded': has_winners,       # Strict gate boolean
-                    'certs_uploaded': has_certs            # Strict gate boolean
+                    'brochure_img': "", 
+                    'attendance_uploaded': has_attendance, 
+                    'certificates_uploaded': has_certs, # FIXED: Changed from certs_uploaded to match your .docx exactly!
+                    'winners_uploaded': has_winners       
                 }
                 
-                # Safe empty baseline padding keys
+                # Pre-initialize dictionary workspace elements cleanly
                 for i in range(1, 11):
                     ctx[f'attendance_img_{i}'] = ""
-                    ctx[f'winners_img_{i}'] = ""
                     ctx[f'certificate_img_{i}'] = ""
+                    ctx[f'winners_img_{i}'] = ""
                 for i in range(1, 7):
                     ctx[f'image_{i}'] = ""
                 
-                # 1. Map Brochure
+                # 1. Brochure Image Pass
                 if brochure_file and brochure_file.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png']: 
                     ctx['brochure_img'] = InlineImage(doc, io.BytesIO(brochure_file.getvalue()), width=Inches(4.5))
                 
-                # 2. Map Multi-Attendance sheets
+                # 2. Multi-Attendance Image Pass
                 if has_attendance:
                     att_idx = 1
                     for att_f in attendance_files:
                         if att_f.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png'] and att_idx <= 10:
-                            if att_idx == 1:
-                                ctx['attendance_img'] = InlineImage(doc, io.BytesIO(att_f.getvalue()), width=Inches(4.5))
                             ctx[f'attendance_img_{att_idx}'] = InlineImage(doc, io.BytesIO(att_f.getvalue()), width=Inches(4.5))
                             att_idx += 1
 
-                # 3. Map Winners list
-                if has_winners:
-                    win_idx = 1
-                    for win_f in winners_file:
-                        if win_f.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png'] and win_idx <= 10:
-                            ctx[f'winners_img_{win_idx}'] = InlineImage(doc, io.BytesIO(win_f.getvalue()), width=Inches(4.5))
-                            win_idx += 1
-
-                # 4. Map Certificates
+                # 3. Multi-Certificates Image Pass
                 if has_certs:
                     cert_idx = 1
                     for cert_f in certificates_file:
                         if cert_f.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png'] and cert_idx <= 10:
                             ctx[f'certificate_img_{cert_idx}'] = InlineImage(doc, io.BytesIO(cert_f.getvalue()), width=Inches(4.5))
                             cert_idx += 1
+
+                # 4. Multi-Winners List Image Pass
+                if has_winners:
+                    win_idx = 1
+                    for win_f in winners_file:
+                        if win_f.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png'] and win_idx <= 10:
+                            ctx[f'winners_img_{win_idx}'] = InlineImage(doc, io.BytesIO(win_f.getvalue()), width=Inches(4.5))
+                            win_idx += 1
                 
-                # 5. Map Combined Event Photos
+                # 5. Combined Photo Display Map
                 combined_photos = []
                 if non_geotag_photos:
                     combined_photos.extend(non_geotag_photos)
