@@ -15,10 +15,10 @@ DEPARTMENTS = [
     "Management", 
     "Commerce",
     "IQAC",
-    "Research & Innovation"
-    "Physical Education"
-    "Committee"
-    "Cell"
+    "Research & Innovation",
+    "Physical Education",
+    "Committee",
+    "Cell",
     "Club"
 ]
 
