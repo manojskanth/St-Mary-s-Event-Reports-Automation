@@ -136,7 +136,6 @@ with st.form("main_form"):
     up_col1, up_col2 = st.columns(2)
     with up_col1:
         brochure_file = st.file_uploader("Upload Brochure/Circular", type=ALLOWED_EXTENSIONS)
-        # Enabled to accept multiple file attachments seamlessly
         attendance_files = st.file_uploader("Upload List of Participants with signatures", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
         winners_file = st.file_uploader("Upload Winners’ details (If Competition)", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
     with up_col2:
@@ -177,6 +176,10 @@ if submit:
                 doc = DocxTemplate(template_path)
                 dynamic_dept_header = form_dept if form_dept in ["IQAC", "Research & Innovation"] else f"Department of {form_dept}"
                 
+                # Check absolute validation for optional fields before passing layout logic tokens
+                has_winners = (att_e == "Attached") and bool(winners_file)
+                has_certs = (att_d == "Attached") and bool(certificates_file)
+
                 ctx = {
                     'event_title': str(event_title).strip(),
                     'event_date': event_date.strftime("%d-%m-%Y"),
@@ -189,22 +192,50 @@ if submit:
                     'objectives': str(obj if is_iqac else ""),
                     'outcomes': str(out if is_iqac else ""),
                     'attach_a': str(att_a), 'attach_b': str(att_b), 'attach_c': str(att_c), 'attach_d': str(att_d), 'attach_e': str(att_e),
-                    'brochure_img': "", 'attendance_img': "", 'image_1': "", 'image_2': "", 'image_3': "", 'image_4': "", 'image_5': "", 'image_6': ""
+                    'brochure_img': "", 'attendance_img': "",
+                    'winners_uploaded': has_winners,       # Structural conditional logic gates
+                    'certs_uploaded': has_certs            # Structural conditional logic gates
                 }
                 
+                # Pre-initialize dynamic tracking context items securely
+                for i in range(1, 11):
+                    ctx[f'attendance_img_{i}'] = ""
+                    ctx[f'winners_img_{i}'] = ""
+                    ctx[f'certificate_img_{i}'] = ""
+                for i in range(1, 7):
+                    ctx[f'image_{i}'] = ""
+                
+                # 1. Map Brochure
                 if brochure_file and brochure_file.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png']: 
                     ctx['brochure_img'] = InlineImage(doc, io.BytesIO(brochure_file.getvalue()), width=Inches(4.5))
                 
-                # Handles multiple participant list image loops sequentially into the template variables
+                # 2. Map Multi-Attendance sheets
                 if attendance_files:
                     att_idx = 1
                     for att_f in attendance_files:
-                        if att_f.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png']:
+                        if att_f.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png'] and att_idx <= 10:
                             if att_idx == 1:
                                 ctx['attendance_img'] = InlineImage(doc, io.BytesIO(att_f.getvalue()), width=Inches(4.5))
                             ctx[f'attendance_img_{att_idx}'] = InlineImage(doc, io.BytesIO(att_f.getvalue()), width=Inches(4.5))
                             att_idx += 1
+
+                # 3. Conditional evaluation layout for Winners list
+                if has_winners:
+                    win_idx = 1
+                    for win_f in winners_file:
+                        if win_f.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png'] and win_idx <= 10:
+                            ctx[f'winners_img_{win_idx}'] = InlineImage(doc, io.BytesIO(win_f.getvalue()), width=Inches(4.5))
+                            win_idx += 1
+
+                # 4. Conditional evaluation layout for Certificates
+                if has_certs:
+                    cert_idx = 1
+                    for cert_f in certificates_file:
+                        if cert_f.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png'] and cert_idx <= 10:
+                            ctx[f'certificate_img_{cert_idx}'] = InlineImage(doc, io.BytesIO(cert_f.getvalue()), width=Inches(4.5))
+                            cert_idx += 1
                 
+                # 5. Map Combined Event Photos
                 combined_photos = []
                 if non_geotag_photos:
                     combined_photos.extend(non_geotag_photos)
