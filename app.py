@@ -176,7 +176,8 @@ if submit:
                 doc = DocxTemplate(template_path)
                 dynamic_dept_header = form_dept if form_dept in ["IQAC", "Research & Innovation"] else f"Department of {form_dept}"
                 
-                # Check validation for optional fields
+                # Rigid logic verification gate mappings
+                has_attendance = (att_c == "Attached") and bool(attendance_files)
                 has_winners = (att_e == "Attached") and bool(winners_file)
                 has_certs = (att_d == "Attached") and bool(certificates_file)
 
@@ -193,11 +194,12 @@ if submit:
                     'outcomes': str(out if is_iqac else ""),
                     'attach_a': str(att_a), 'attach_b': str(att_b), 'attach_c': str(att_c), 'attach_d': str(att_d), 'attach_e': str(att_e),
                     'brochure_img': "", 'attendance_img': "",
-                    'winners_uploaded': has_winners,       
-                    'certs_uploaded': has_certs            
+                    'attendance_uploaded': has_attendance, # Strict gate boolean
+                    'winners_uploaded': has_winners,       # Strict gate boolean
+                    'certs_uploaded': has_certs            # Strict gate boolean
                 }
                 
-                # Pre-initialize tracking context dictionary keys securely
+                # Safe empty baseline padding keys
                 for i in range(1, 11):
                     ctx[f'attendance_img_{i}'] = ""
                     ctx[f'winners_img_{i}'] = ""
@@ -210,7 +212,7 @@ if submit:
                     ctx['brochure_img'] = InlineImage(doc, io.BytesIO(brochure_file.getvalue()), width=Inches(4.5))
                 
                 # 2. Map Multi-Attendance sheets
-                if attendance_files:
+                if has_attendance:
                     att_idx = 1
                     for att_f in attendance_files:
                         if att_f.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png'] and att_idx <= 10:
@@ -219,7 +221,7 @@ if submit:
                             ctx[f'attendance_img_{att_idx}'] = InlineImage(doc, io.BytesIO(att_f.getvalue()), width=Inches(4.5))
                             att_idx += 1
 
-                # 3. Conditional evaluation layout for Winners list
+                # 3. Map Winners list
                 if has_winners:
                     win_idx = 1
                     for win_f in winners_file:
@@ -227,7 +229,7 @@ if submit:
                             ctx[f'winners_img_{win_idx}'] = InlineImage(doc, io.BytesIO(win_f.getvalue()), width=Inches(4.5))
                             win_idx += 1
 
-                # 4. Conditional evaluation layout for Certificates
+                # 4. Map Certificates
                 if has_certs:
                     cert_idx = 1
                     for cert_f in certificates_file:
@@ -255,7 +257,7 @@ if submit:
                 buf.seek(0)
                 return buf
 
-            st.session_state.iqac_file = create_doc("Sample_Event_Report_Template_Final.docx", is_iqac=True)
+            st.session_state.iqac_file = create_doc("Sample_Event_Report_Template.docx", is_iqac=True)
             st.session_state.sm_file = create_doc("Social_Media_Report_Template.docx", is_iqac=False)
             
             st.success("✅ Both institutional documents compiled successfully!")
