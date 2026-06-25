@@ -16,6 +16,10 @@ DEPARTMENTS = [
     "Commerce",
     "IQAC",
     "Research & Innovation"
+    "Physical Education"
+    "Committee"
+    "Cell"
+    "Club"
 ]
 
 ACADEMIC_YEARS = [
