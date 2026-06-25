@@ -48,7 +48,7 @@ def generate_ai_content(section_name, notes, dept_name="", title_text="", style=
         )
     else: # IQAC Narrative
         rules = (
-            "Formal academic academic summary. STRICT LIMIT: Max 150 words. No intro fluff or placeholder text. "
+            "Formal academic summary. STRICT LIMIT: Max 150 words. No intro fluff or placeholder text. "
             "Keep content strictly proportionate to inputs provided without exaggerating or hallucinating additional events."
         )
 
@@ -139,12 +139,12 @@ with st.form("main_form"):
         attendance_file = st.file_uploader("Upload List of Participants with signatures", type=ALLOWED_EXTENSIONS)
         winners_file = st.file_uploader("Upload Winners’ details (If Competition)", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
     with up_col2:
-        # Split photo uploads into Non-Geotag and Geotag files layout blocks
         non_geotag_photos = st.file_uploader("Upload Non-Geotag Photos", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
         geotag_photos = st.file_uploader("Upload GeoTag Photos", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
         certificates_file = st.file_uploader("Upload Certificates Issued (with title and date)", type=ALLOWED_EXTENSIONS, accept_multiple_files=True)
 
-   submit = st.form_submit_button("🚀 Generate Event Report, Social Media Report, and ZIP folder", use_container_width=True)
+    # Indentation perfectly balanced straight inside the form block scope boundaries
+    submit = st.form_submit_button("🚀 Generate Event Report, Social Media Report, and ZIP folder", use_container_width=True)
 
 # --- 5. DATA COMPILATION PIPELINE ---
 if submit:
@@ -197,7 +197,6 @@ if submit:
                 if attendance_file and attendance_file.name.split(".")[-1].lower() in ['jpg', 'jpeg', 'png']: 
                     ctx['attendance_img'] = InlineImage(doc, io.BytesIO(attendance_file.getvalue()), width=Inches(4.5))
                 
-                # Combine both Non-Geotag and Geotag files array matrix for the Word rendering block structure
                 combined_photos = []
                 if non_geotag_photos:
                     combined_photos.extend(non_geotag_photos)
@@ -244,7 +243,6 @@ if st.session_state.iqac_file and st.session_state.sm_file:
         use_container_width=True
     )
     
-    # Check explicitly if Non-Geotag photos exist to package into zip
     if non_geotag_photos:
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
@@ -253,7 +251,7 @@ if st.session_state.iqac_file and st.session_state.sm_file:
                 file_ext = file_asset.name.split(".")[-1]
                 archive_name = f"Document_{idx+1}.{file_ext}"
                 zip_file.writestr(archive_name, file_bytes)
-                file_asset.seek(0)  # Reset pointer to avoid breaking future form processing runs
+                file_asset.seek(0)
         
         zip_buffer.seek(0)
         clean_folder_title = event_title.replace(" ", "_")
